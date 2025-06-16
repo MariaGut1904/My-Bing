@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, SafeAreaView, ScrollView, Dimensions, Image, FlatList, Keyboard, ImageBackground, TouchableWithoutFeedback } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, SafeAreaView, ScrollView, Dimensions, Image, FlatList, Keyboard, ImageBackground, TouchableWithoutFeedback, Switch, AppState } from 'react-native';
 import DropDownPicker from 'react-native-dropdown-picker';
 import * as Animatable from 'react-native-animatable';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -11,7 +11,7 @@ const { width } = Dimensions.get('window');
 const SchedulePlanner = () => {
   const { scheduleData, setScheduleData } = useSchedule();
   const [openMonth, setOpenMonth] = useState(false);
-  const [semester, setSemester] = useState('Fall');
+  const [semester, setSemester] = useState('Fall 2025');
   const [openDay, setOpenDay] = useState(false);
   const [day, setDay] = useState(null);
   const [className, setClassName] = useState('');
@@ -20,37 +20,80 @@ const SchedulePlanner = () => {
   const [dailyClasses, setDailyClasses] = useState([]);
   const [allClasses, setAllClasses] = useState([]);
   const [markedDates, setMarkedDates] = useState({});
-  const [selectedDate, setSelectedDate] = useState('');
+  const [selectedDate, setSelectedDate] = useState(null);
   const [isEvent, setIsEvent] = useState(false);
+  const [isShared, setIsShared] = useState(false);
   const [eventDescription, setEventDescription] = useState('');
-  const [currentUser, setCurrentUser] = useState('You'); // Default creator name
+  const [currentUser, setCurrentUser] = useState('You');
+  const [showEventsInCalendar, setShowEventsInCalendar] = useState(true);
+  const [semesterOpen, setSemesterOpen] = useState(false);
+  const [dayOpen, setDayOpen] = useState(false);
 
-  // Load saved classes on mount
+  // Load classes when component mounts
   useEffect(() => {
     const loadClasses = async () => {
       try {
-        const savedClasses = await AsyncStorage.getItem('classes');
+        console.log('Loading classes for user:', currentUser);
+        const savedClasses = await AsyncStorage.getItem('allClasses');
+        console.log('Raw saved classes:', savedClasses);
+        
         if (savedClasses) {
-          const parsed = JSON.parse(savedClasses);
-          setAllClasses(parsed);
+          const parsedClasses = JSON.parse(savedClasses);
+          console.log('Parsed classes:', parsedClasses);
           
-          // Update marked dates
-          const dates = {};
-          parsed.forEach(cls => {
-            dates[cls.date] = { marked: true, dotColor: '#a259c6' };
+          // Only load classes that are either created by current user or shared
+          const relevantClasses = parsedClasses.filter(cls => {
+            const isRelevant = cls.creator === currentUser || cls.isShared;
+            console.log('Class:', cls.name, 'isRelevant:', isRelevant, 'creator:', cls.creator, 'isShared:', cls.isShared);
+            return isRelevant;
           });
-          setMarkedDates(dates);
+          
+          console.log('Setting relevant classes:', relevantClasses);
+          setAllClasses(relevantClasses);
+          setScheduleData(relevantClasses);
+          
+          // Update marked dates for all loaded classes
+          const newMarkedDates = {};
+          relevantClasses.forEach(item => {
+            if (item.isRecurring) {
+              const semesterDates = getSemesterDates(semester);
+              let currentDate = new Date(semesterDates.start);
+              while (currentDate <= semesterDates.end) {
+                if (currentDate.getDay() === item.day) {
+                  const dateStr = currentDate.toISOString().split('T')[0];
+                  newMarkedDates[dateStr] = { marked: true, dotColor: '#a259c6' };
+                }
+                currentDate.setDate(currentDate.getDate() + 1);
+              }
+            } else {
+              newMarkedDates[item.date] = { marked: true, dotColor: '#a259c6' };
+            }
+          });
+          setMarkedDates(newMarkedDates);
         }
       } catch (error) {
-        console.error('Failed to load classes', error);
+        console.error('Error loading classes:', error);
       }
     };
-    loadClasses();
-  }, []);
 
-  // Save classes when they change
+    loadClasses();
+  }, [currentUser, semester]);
+
+  // Save classes whenever they change
   useEffect(() => {
-    AsyncStorage.setItem('classes', JSON.stringify(allClasses));
+    const saveClasses = async () => {
+      try {
+        if (allClasses.length > 0) {
+          console.log('Saving classes:', allClasses);
+          await AsyncStorage.setItem('allClasses', JSON.stringify(allClasses));
+          console.log('Successfully saved classes to AsyncStorage');
+        }
+      } catch (error) {
+        console.error('Error saving classes:', error);
+      }
+    };
+
+    saveClasses();
   }, [allClasses]);
 
   const resetSchedule = async () => {
@@ -72,15 +115,52 @@ const SchedulePlanner = () => {
     );
   };
 
+  const handleDeleteAll = () => {
+    Alert.alert(
+      "Delete All",
+      "Are you sure you want to delete all classes and events? This cannot be undone.",
+      [
+        {
+          text: "Cancel",
+          style: "cancel"
+        },
+        {
+          text: "Delete All",
+          style: "destructive",
+          onPress: () => {
+            setAllClasses([]);
+            setScheduleData([]);
+            Alert.alert("Success", "All classes and events have been deleted.");
+          }
+        }
+      ]
+    );
+  };
+
   const days = [
-    { label: "Monday", value: 1 },
-    { label: "Tuesday", value: 2 },
-    { label: "Wednesday", value: 3 },
-    { label: "Thursday", value: 4 },
-    { label: "Friday", value: 5 },
-    { label: "Saturday", value: 6 },
-    { label: "Sunday", value: 0 }
+    { label: 'Sunday', value: 0 },
+    { label: 'Monday', value: 1 },
+    { label: 'Tuesday', value: 2 },
+    { label: 'Wednesday', value: 3 },
+    { label: 'Thursday', value: 4 },
+    { label: 'Friday', value: 5 },
+    { label: 'Saturday', value: 6 }
   ];
+
+  const getSemesterDates = (semester) => {
+    const [term, year] = semester.split(' ');
+    if (term === 'Fall') {
+      return {
+        start: new Date(parseInt(year), 7, 1), // August 1st
+        end: new Date(parseInt(year), 11, 31)  // December 31st
+      };
+    } else {
+      return {
+        start: new Date(parseInt(year), 0, 1),  // January 1st
+        end: new Date(parseInt(year), 4, 31)    // May 31st
+      };
+    }
+  };
 
   const handleAddClass = () => {
     Keyboard.dismiss();
@@ -97,7 +177,20 @@ const SchedulePlanner = () => {
       }
     }
 
-    const itemDay = isEvent ? new Date(selectedDate).getDay() : day;
+    const semesterDates = getSemesterDates(semester);
+    const selectedDateObj = new Date(selectedDate);
+    
+    if (selectedDateObj < semesterDates.start || selectedDateObj > semesterDates.end) {
+      Alert.alert(
+        "Invalid Date",
+        `Please select a date between ${semesterDates.start.toLocaleDateString()} and ${semesterDates.end.toLocaleDateString()} for ${semester}`,
+        [{ text: "OK" }]
+      );
+      return;
+    }
+
+    const itemDay = isEvent ? selectedDateObj.getDay() : day;
+    const dateStr = selectedDate.split('T')[0]; // Format: YYYY-MM-DD
     
     const newItem = {
       id: Date.now().toString(),
@@ -106,7 +199,7 @@ const SchedulePlanner = () => {
       startTime,
       endTime,
       day: itemDay,
-      date: isEvent ? selectedDate : new Date().toISOString().split('T')[0],
+      date: dateStr,
       isRecurring: !isEvent,
       creator: currentUser,
       semester: semester,
@@ -117,80 +210,41 @@ const SchedulePlanner = () => {
     setAllClasses(updatedClasses);
     setScheduleData(updatedClasses);
     
-    const updatedMarkedDates = { ...markedDates };
-    
-    if (!isEvent) {
-      // For classes (always recurring), mark all future dates matching this day AND semester
-      const today = new Date();
-      const currentYear = today.getFullYear();
-      
-      // Define semester date ranges (months are 0-indexed in JavaScript)
-      const semesterMonths = semester === 'Fall' 
-        ? [7, 8, 9, 10, 11]  // August (7) - December (11)
-        : [0, 1, 2, 3, 4];    // January (0) - May (4)
-
-      for (let i = 0; i < 180; i++) { // Check next 6 months
-        const date = new Date();
-        date.setDate(today.getDate() + i);
-        
-        // Check if date is within semester months and matches the selected day
-        if (semesterMonths.includes(date.getMonth()) && date.getDay() === day) {
-          const dateStr = date.toISOString().split('T')[0];
-          updatedMarkedDates[dateStr] = { 
-            marked: true, 
-            dotColor: '#a259c6',
-            customStyles: {
-              container: {
-                backgroundColor: '#f0d0ff',
-                borderRadius: 12
-              }
-            }
-          };
-        }
-      }
+    // Update marked dates
+    const newMarkedDates = { ...markedDates };
+    if (isEvent) {
+      newMarkedDates[dateStr] = { marked: true, dotColor: '#a259c6' };
     } else {
-      // For events (single day only)
-      updatedMarkedDates[selectedDate] = { 
-        marked: true, 
-        dotColor: '#ff85a2',
-        customStyles: {
-          container: {
-            backgroundColor: '#ffb6c1',
-            borderRadius: 12
-          }
+      // For recurring classes, mark all dates in the semester
+      const semesterDates = getSemesterDates(semester);
+      let currentDate = new Date(semesterDates.start);
+      while (currentDate <= semesterDates.end) {
+        if (currentDate.getDay() === itemDay) {
+          const dateStr = currentDate.toISOString().split('T')[0];
+          newMarkedDates[dateStr] = { marked: true, dotColor: '#a259c6' };
         }
-      };
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
     }
-
-    setMarkedDates(updatedMarkedDates);
+    setMarkedDates(newMarkedDates);
     
-    // Update daily items if we're adding to the currently selected date
-    if (selectedDate === newItem.date || (!isEvent && new Date().getDay() === day)) {
-      setDailyClasses(prev => [...prev, newItem]);
-    }
-
-    // Clear form
+    // Reset form
     setClassName('');
     setEventDescription('');
     setStartTime('');
     setEndTime('');
+    setDay(null);
   };
 
   const handleDayPress = (day) => {
+    // Use the exact date from the calendar
     setSelectedDate(day.dateString);
     
-    // Parse the date string in local timezone to avoid UTC conversion issues
-    const dateParts = day.dateString.split('-');
-    const selectedDateObj = new Date(
-      parseInt(dateParts[0]),  // year
-      parseInt(dateParts[1]) - 1,  // month (0-indexed)
-      parseInt(dateParts[2])   // day
-    );
+    const [year, month, date] = day.dateString.split('-').map(Number);
+    const selectedDateObj = new Date(year, month - 1, date);
+    const selectedDay = selectedDateObj.getDay();
     
-    const selectedDay = selectedDateObj.getDay(); // 0 (Sun) to 6 (Sat)
-    const selectedDayName = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][selectedDay];
-    
-    console.log(`Selected: ${day.dateString} (${selectedDayName})`);
+    console.log(`Selected: ${day.dateString} (${selectedDay})`);
 
     const filtered = allClasses.filter(cls => {
       if (cls.isRecurring) {
@@ -200,11 +254,6 @@ const SchedulePlanner = () => {
         
         const dayMatch = selectedDay === cls.day;
         const monthMatch = semesterMonths.includes(selectedDateObj.getMonth());
-        
-        console.log(`Class "${cls.name}": 
-          Day ${cls.day} (${['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][cls.day]}) vs Selected ${selectedDay} (${selectedDayName})
-          Semester ${cls.semester} vs Current ${semester}
-          Month ${selectedDateObj.getMonth()} in semester? ${monthMatch}`);
         
         return dayMatch && monthMatch && cls.semester === semester;
       } else {
@@ -216,214 +265,424 @@ const SchedulePlanner = () => {
     setDailyClasses(filtered);
   };
 
+  const handleShare = async (item) => {
+    // Check if this item is already shared
+    const isAlreadyShared = allClasses.some(cls => 
+      cls.isShared && 
+      cls.name === item.name && 
+      cls.startTime === item.startTime && 
+      cls.endTime === item.endTime &&
+      cls.day === item.day
+    );
+
+    if (isAlreadyShared) {
+      Alert.alert(
+        "Already Shared",
+        "This class is already shared with everyone!",
+        [{ text: "OK" }]
+      );
+      return;
+    }
+
+    // Create a copy of the item with the current user as creator
+    const sharedItem = {
+      ...item,
+      id: Date.now().toString(),
+      creator: currentUser,
+      isShared: true,
+      sharedBy: currentUser,
+      date: item.date,
+      day: item.day
+    };
+
+    try {
+      // Get existing classes from AsyncStorage
+      const existingClassesStr = await AsyncStorage.getItem('allClasses');
+      const existingClasses = existingClassesStr ? JSON.parse(existingClassesStr) : [];
+      
+      // Add the new shared class
+      const updatedClasses = [...existingClasses, sharedItem];
+      
+      // Save to AsyncStorage
+      await AsyncStorage.setItem('allClasses', JSON.stringify(updatedClasses));
+      console.log('Saved shared class to AsyncStorage:', sharedItem);
+      
+      // Update state
+      setAllClasses(updatedClasses);
+      setScheduleData(updatedClasses);
+
+      // Update marked dates for the shared item
+      const newMarkedDates = { ...markedDates };
+      if (item.isRecurring) {
+        // For recurring classes, mark all dates in the semester
+        const semesterDates = getSemesterDates(semester);
+        let currentDate = new Date(semesterDates.start);
+        while (currentDate <= semesterDates.end) {
+          if (currentDate.getDay() === item.day) {
+            const dateStr = currentDate.toISOString().split('T')[0];
+            newMarkedDates[dateStr] = { marked: true, dotColor: '#a259c6' };
+          }
+          currentDate.setDate(currentDate.getDate() + 1);
+        }
+      } else {
+        // For one-time events, mark the specific date
+        newMarkedDates[item.date] = { marked: true, dotColor: '#a259c6' };
+      }
+      setMarkedDates(newMarkedDates);
+
+      // Show success message
+      Alert.alert(
+        "Shared!",
+        `${item.type === 'class' ? 'Class' : 'Event'} has been shared with everyone!`,
+        [{ text: "OK" }]
+      );
+    } catch (error) {
+      console.error('Error sharing class:', error);
+      Alert.alert(
+        "Error",
+        "Failed to share the class. Please try again.",
+        [{ text: "OK" }]
+      );
+    }
+  };
+
+  const getDailySchedule = () => {
+    if (!selectedDate) return [];
+    
+    // Use the exact date string from the calendar
+    const [year, month, date] = selectedDate.split('-').map(Number);
+    const selectedDateObj = new Date(year, month - 1, date);
+    const selectedDay = selectedDateObj.getDay();
+    const selectedDateStr = selectedDate;
+    
+    console.log('Getting schedule for:', selectedDateStr, 'Day:', selectedDay);
+    console.log('Current user:', currentUser);
+    console.log('All classes:', allClasses);
+    
+    // Use a Set to track unique classes
+    const uniqueClasses = new Set();
+    
+    const filteredClasses = allClasses.filter(item => {
+      // Create a unique key for this class
+      const classKey = `${item.name}-${item.startTime}-${item.endTime}-${item.day}`;
+      
+      // Skip if we've already seen this class
+      if (uniqueClasses.has(classKey)) {
+        return false;
+      }
+      
+      // Add to our set of seen classes
+      uniqueClasses.add(classKey);
+      
+      // For recurring classes
+      if (item.isRecurring) {
+        if (item.day === selectedDay) {
+          // Show if it's the user's class or if it's shared
+          const shouldShow = item.creator === currentUser || item.isShared;
+          console.log('Recurring class:', item.name, 'shouldShow:', shouldShow);
+          return shouldShow;
+        }
+        return false;
+      }
+      
+      // For one-time events
+      if (item.date === selectedDateStr) {
+        // Show if it's the user's class or if it's shared
+        const shouldShow = item.creator === currentUser || item.isShared;
+        console.log('One-time event:', item.name, 'shouldShow:', shouldShow);
+        return shouldShow;
+      }
+      
+      return false;
+    });
+
+    console.log('Filtered classes:', filteredClasses);
+    return filteredClasses;
+  };
+
+  const renderDailyItem = ({ item }) => (
+    <Animatable.View animation="fadeIn" style={styles.dailyItem}>
+      <View style={styles.dailyItemContent}>
+        <View style={styles.dailyItemInfo}>
+          <Text style={styles.dailyItemTitle}>
+            {item.name}
+            <Text style={styles.creatorText}> ~{item.creator}</Text>
+          </Text>
+          <Text style={styles.dailyItemTime}>
+            {item.startTime} - {item.endTime}
+          </Text>
+        </View>
+      </View>
+      {!isShared && item.creator === currentUser && (
+        <TouchableOpacity 
+          style={styles.shareButton}
+          onPress={() => handleShare(item)}
+        >
+          <Text style={styles.shareButtonText}>Share</Text>
+        </TouchableOpacity>
+      )}
+    </Animatable.View>
+  );
+
+  const getMarkedDates = () => {
+    const marked = {};
+    
+    allClasses.forEach(cls => {
+      if (cls.isRecurring) {
+        // For recurring classes, mark all dates in the semester
+        const semesterDates = getSemesterDates(cls.semester);
+        let currentDate = new Date(semesterDates.start);
+        while (currentDate <= semesterDates.end) {
+          if (currentDate.getDay() === cls.day) {
+            const dateStr = currentDate.toISOString().split('T')[0];
+            marked[dateStr] = { marked: true, dotColor: '#a259c6' };
+          }
+          currentDate.setDate(currentDate.getDate() + 1);
+        }
+      } else {
+        // For one-time events, mark the specific date
+        marked[cls.date] = { marked: true, dotColor: '#a259c6' };
+      }
+    });
+    
+    return marked;
+  };
+
+  // Add useEffect to update daily schedule when selectedDate changes
+  useEffect(() => {
+    if (selectedDate) {
+      const schedule = getDailySchedule();
+      console.log('Updating daily schedule for date:', selectedDate);
+      console.log('Schedule:', schedule);
+      setDailyClasses(schedule);
+    }
+  }, [selectedDate, allClasses, isShared]);
+
+  // Add console.log for debugging
+  useEffect(() => {
+    if (selectedDate) {
+      console.log('Selected Date:', selectedDate);
+      console.log('All Classes:', allClasses);
+      console.log('Marked Dates:', markedDates);
+      console.log('Daily Schedule:', getDailySchedule());
+    }
+  }, [selectedDate, allClasses, markedDates]);
+
+  // Add useEffect to reload classes when the app comes to foreground
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', nextAppState => {
+      if (nextAppState === 'active') {
+        console.log('App came to foreground, reloading classes...'); // Debug log
+        loadClasses();
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [currentUser, semester]);
+
   return (
     <ImageBackground source={require('../assets/pixel-bg.png')} style={styles.bg}>
       <SafeAreaView style={{ flex: 1 }}>
         <Animatable.View animation="bounceIn" style={styles.header}>
           <Image source={require('../assets/kawaii-star.gif')} style={styles.starIcon} />
           <Text style={styles.title}>✨ Schedule Planner ✨</Text>
+          <TouchableOpacity 
+            style={styles.deleteButton}
+            onPress={handleDeleteAll}
+          >
+            <Text style={styles.deleteButtonText}>Delete All</Text>
+          </TouchableOpacity>
         </Animatable.View>
 
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-          <ScrollView contentContainerStyle={styles.scrollContainer}>
-            <View style={styles.toggleContainer}>
-              <TouchableOpacity 
-                style={[styles.toggleButton, !isEvent && styles.activeToggle]}
-                onPress={() => setIsEvent(false)}
-              >
-                <Text style={styles.toggleText}>Class</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.toggleButton, isEvent && styles.activeToggle]}
-                onPress={() => setIsEvent(true)}
-              >
-                <Text style={styles.toggleText}>Event</Text>
-              </TouchableOpacity>
-            </View>
-
-            <Text style={styles.sectionTitle}>Add New {isEvent ? 'Event' : 'Class'}</Text>
-
-            {!isEvent ? (
-              <>
-                <DropDownPicker
-                  open={openMonth}
-                  value={semester}
-                  items={[
-                    { label: 'Fall', value: 'Fall' },
-                    { label: 'Spring', value: 'Spring' }
-                  ]}
-                  setOpen={setOpenMonth}
-                  setValue={setSemester}
-                  placeholder="Select Semester"
-                  style={styles.dropdown}
-                  dropDownContainerStyle={styles.dropdownList}
-                />
-
-                <TextInput
-                  style={styles.input}
-                  placeholder="Class Name"
-                  value={className}
-                  onChangeText={setClassName}
-                />
-
-                <TextInput
-                  style={styles.input}
-                  placeholder="Start Time (e.g. 09:00)"
-                  value={startTime}
-                  onChangeText={setStartTime}
-                  keyboardType="numeric"
-                />
-
-                <TextInput
-                  style={styles.input}
-                  placeholder="End Time (e.g. 10:30)"
-                  value={endTime}
-                  onChangeText={setEndTime}
-                  keyboardType="numeric"
-                />
-
-                <DropDownPicker
-                  open={openDay}
-                  value={day}
-                  items={days}
-                  setOpen={setOpenDay}
-                  setValue={setDay}
-                  placeholder="Select Day"
-                  style={styles.dropdown}
-                  dropDownContainerStyle={styles.dropdownList}
-                  listMode="SCROLLVIEW"
-                />
-              </>
-            ) : (
-              <>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Event Description"
-                  value={eventDescription}
-                  onChangeText={setEventDescription}
-                  multiline
-                />
-
-                <TextInput
-                  style={styles.input}
-                  placeholder="Start Time (e.g. 09:00)"
-                  value={startTime}
-                  onChangeText={setStartTime}
-                  keyboardType="numeric"
-                />
-
-                <TextInput
-                  style={styles.input}
-                  placeholder="End Time (e.g. 10:30)"
-                  value={endTime}
-                  onChangeText={setEndTime}
-                  keyboardType="numeric"
-                />
-              </>
-            )}
-
-            <TouchableOpacity style={styles.addButton} onPress={handleAddClass}>
-              <Text style={styles.addButtonText}>Add {isEvent ? 'Event' : 'Class'}</Text>
+        <ScrollView contentContainerStyle={styles.scrollContainer}>
+          <View style={styles.toggleContainer}>
+            <TouchableOpacity 
+              style={[styles.toggleButton, !isEvent && !isShared && styles.activeToggle]}
+              onPress={() => {
+                setIsEvent(false);
+                setIsShared(false);
+              }}
+            >
+              <Text style={styles.toggleText}>Class</Text>
             </TouchableOpacity>
-
-            <Calendar
-              onDayPress={handleDayPress}
-              markedDates={{
-                ...markedDates,
-                [selectedDate]: { selected: true, selectedColor: '#a259c6' }
+            <TouchableOpacity 
+              style={[styles.toggleButton, isEvent && !isShared && styles.activeToggle]}
+              onPress={() => {
+                setIsEvent(true);
+                setIsShared(false);
               }}
-              theme={{
-                calendarBackground: '#fff0fa',
-                selectedDayBackgroundColor: '#a259c6',
-                todayTextColor: '#a259c6',
-                'stylesheet.calendar.header': {
-                  dayHeader: {
-                    color: '#6e3abf',
-                    fontFamily: 'PressStart2P',
-                  }
-                }
+            >
+              <Text style={styles.toggleText}>Event</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.toggleButton, isShared && styles.activeToggle]}
+              onPress={() => {
+                setIsShared(true);
+                setIsEvent(false);
               }}
-              firstDay={1}
-            />
+            >
+              <Text style={styles.toggleText}>Shared</Text>
+            </TouchableOpacity>
+          </View>
 
-            {dailyClasses.length > 0 ? (
-              <View style={styles.classListContainer}>
-                <Text style={styles.sectionTitle}>
-                  {dailyClasses[0].isRecurring ? 'Classes' : 'Events'} on {new Date(selectedDate).toLocaleDateString()}
-                </Text>
-                {dailyClasses.map((item) => (
-                  <View key={item.id} style={styles.classCard}>
-                    <Text style={styles.className}>
-                      {item.type === 'event' ? '🎀 ' : '📚 '}{item.name}
-                    </Text>
-                    <Text style={styles.classTime}>
-                      {item.startTime} - {item.endTime}
-                    </Text>
-                    {item.isRecurring && (
-                      <Text style={styles.semesterText}>
-                        {item.semester} Semester • Every {days.find(d => d.value === item.day)?.label}
-                      </Text>
-                    )}
-                    <Text style={styles.debugText}>
-                      ID: {item.id} • Added: {new Date(parseInt(item.id)).toLocaleString()}
-                    </Text>
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+            <View style={styles.content}>
+              {/* Calendar */}
+              <Animatable.View animation="fadeInUp" style={styles.calendarContainer}>
+                <Calendar
+                  onDayPress={handleDayPress}
+                  markedDates={getMarkedDates()}
+                  theme={{
+                    calendarBackground: '#fff0fa',
+                    textSectionTitleColor: '#6e3abf',
+                    selectedDayBackgroundColor: '#a259c6',
+                    selectedDayTextColor: '#fff',
+                    todayTextColor: '#ff69b4',
+                    dayTextColor: '#6e3abf',
+                    textDisabledColor: '#d1b3ff',
+                    dotColor: '#6e3abf',
+                    selectedDotColor: '#fff',
+                    arrowColor: '#6e3abf',
+                    monthTextColor: '#6e3abf',
+                    indicatorColor: '#6e3abf',
+                    textDayFontFamily: 'PressStart2P',
+                    textMonthFontFamily: 'PressStart2P',
+                    textDayHeaderFontFamily: 'PressStart2P',
+                  }}
+                />
+              </Animatable.View>
+
+              {/* Add Form - Only show in Class and Event tabs */}
+              {!isShared && (
+                <Animatable.View animation="fadeInUp" delay={100} style={styles.eventCard}>
+                  <Text style={styles.eventCardTitle}>
+                    {isEvent ? 'Add New Event' : 'Add New Class'}
+                  </Text>
+                  
+                  {!isEvent && (
+                    <View style={styles.inputContainer}>
+                      <Text style={styles.inputLabel}>Class Name</Text>
+                      <TextInput
+                        style={styles.input}
+                        value={className}
+                        onChangeText={setClassName}
+                        placeholder="Enter class name"
+                        placeholderTextColor="#d1b3ff"
+                      />
+                    </View>
+                  )}
+
+                  {isEvent && (
+                    <View style={styles.inputContainer}>
+                      <Text style={styles.inputLabel}>Event Description</Text>
+                      <TextInput
+                        style={styles.input}
+                        value={eventDescription}
+                        onChangeText={setEventDescription}
+                        placeholder="Enter event description"
+                        placeholderTextColor="#d1b3ff"
+                      />
+                    </View>
+                  )}
+
+                  <View style={styles.timeContainer}>
+                    <View style={styles.timeInput}>
+                      <Text style={styles.inputLabel}>Start Time</Text>
+                      <TextInput
+                        style={styles.input}
+                        value={startTime}
+                        onChangeText={setStartTime}
+                        placeholder="HH:MM"
+                        placeholderTextColor="#d1b3ff"
+                      />
+                    </View>
+                    <View style={styles.timeInput}>
+                      <Text style={styles.inputLabel}>End Time</Text>
+                      <TextInput
+                        style={styles.input}
+                        value={endTime}
+                        onChangeText={setEndTime}
+                        placeholder="HH:MM"
+                        placeholderTextColor="#d1b3ff"
+                      />
+                    </View>
                   </View>
-                ))}
-              </View>
-            ) : (
-              <View style={styles.noClassesContainer}>
-                <Text style={styles.noClassesText}>
-                  No classes/events found for {new Date(selectedDate).toLocaleDateString()}
-                </Text>
-                <Text style={styles.debugText}>
-                  Selected day: {new Date(selectedDate).getDay()} ({
-                    ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date(selectedDate).getDay()]
-                  })
-                </Text>
-                <Text style={styles.debugText}>
-                  Current semester: {semester}
-                </Text>
-              </View>
-            )}
 
-            <TouchableOpacity 
-              style={styles.resetButton} 
-              onPress={resetSchedule}
-            >
-              <Text style={styles.resetButtonText}>Reset All Classes</Text>
-            </TouchableOpacity>
+                  {!isEvent && (
+                    <>
+                      <View style={styles.semesterContainer}>
+                        <Text style={styles.inputLabel}>Semester</Text>
+                        <DropDownPicker
+                          open={semesterOpen}
+                          value={semester}
+                          items={[
+                            { label: 'Fall 2025', value: 'Fall 2025' },
+                            { label: 'Spring 2026', value: 'Spring 2026' }
+                          ]}
+                          setOpen={setSemesterOpen}
+                          setValue={setSemester}
+                          style={styles.picker}
+                          dropDownContainerStyle={styles.pickerDropdown}
+                          textStyle={styles.pickerText}
+                          placeholder="Select semester"
+                          placeholderStyle={styles.pickerPlaceholder}
+                          zIndex={3000}
+                        />
+                      </View>
 
-            <TouchableOpacity 
-              style={[styles.button, {backgroundColor: '#ccc'}]}
-              onPress={() => console.log('Current state:', {
-                allClasses,
-                dailyClasses,
-                selectedDate,
-                semester
-              })}
-            >
-              <Text style={styles.buttonText}>Debug Info</Text>
-            </TouchableOpacity>
+                      <View style={styles.dayContainer}>
+                        <Text style={styles.inputLabel}>Day of Week</Text>
+                        <DropDownPicker
+                          open={dayOpen}
+                          value={day}
+                          items={days}
+                          setOpen={setDayOpen}
+                          setValue={setDay}
+                          style={styles.picker}
+                          dropDownContainerStyle={styles.pickerDropdown}
+                          textStyle={styles.pickerText}
+                          placeholder="Select day"
+                          placeholderStyle={styles.pickerPlaceholder}
+                          zIndex={2000}
+                        />
+                      </View>
+                    </>
+                  )}
 
-            <View style={styles.debugContainer}>
-              <Text style={styles.debugText}>
-                Debug Info:
-              </Text>
-              <Text style={styles.debugText}>
-                Selected: {selectedDate} ({new Date(selectedDate).toDateString()})
-              </Text>
-              <Text style={styles.debugText}>
-                Day: {new Date(selectedDate).getDay()} ({['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date(selectedDate).getDay()]})
-              </Text>
-              <Text style={styles.debugText}>
-                Current Semester: {semester}
-              </Text>
-              <Text style={styles.debugText}>
-                All Classes: {allClasses.length}
-              </Text>
+                  <TouchableOpacity 
+                    style={styles.addButton}
+                    onPress={handleAddClass}
+                  >
+                    <Text style={styles.addButtonText}>
+                      {isEvent ? 'Add Event' : 'Add Class'}
+                    </Text>
+                  </TouchableOpacity>
+                </Animatable.View>
+              )}
+
+              {/* Daily Schedule */}
+              <Animatable.View animation="fadeInUp" delay={200} style={styles.dailySchedule}>
+                <Text style={styles.dailyTitle}>
+                  {isShared ? "Shared Schedule" : "Your Schedule"} for {selectedDate ? new Date(selectedDate).toLocaleDateString() : 'Selected Day'}
+                </Text>
+                {getDailySchedule().length > 0 ? (
+                  <FlatList
+                    data={getDailySchedule()}
+                    renderItem={renderDailyItem}
+                    keyExtractor={item => item.id}
+                    style={styles.dailyList}
+                  />
+                ) : (
+                  <Text style={styles.noScheduleText}>
+                    No {isShared ? 'shared ' : ''}schedule for this day
+                  </Text>
+                )}
+              </Animatable.View>
             </View>
-          </ScrollView>
-        </TouchableWithoutFeedback>
+          </TouchableWithoutFeedback>
+        </ScrollView>
       </SafeAreaView>
     </ImageBackground>
   );
@@ -447,13 +706,11 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    backgroundColor: 'rgba(210, 170, 255, 0.15)',
-    borderBottomWidth: 1,
-    borderColor: '#d1b3ff',
-    marginBottom: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    backgroundColor: '#fff0fa',
   },
   starIcon: {
     width: 30,
@@ -583,16 +840,17 @@ const styles = StyleSheet.create({
     borderColor: '#d1b3ff'
   },
   deleteButton: {
-    backgroundColor: '#f96565',
-    borderRadius: 8,
-    padding: 5,
-    marginTop: 5,
-    alignSelf: 'flex-end',
+    backgroundColor: '#ff6b6b',
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 15,
+    borderWidth: 2,
+    borderColor: '#ff4757',
   },
   deleteButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
-    fontSize: 12,
+    fontFamily: 'PressStart2P',
+    fontSize: 10,
+    color: '#fff',
   },
   toggleContainer: {
     flexDirection: 'row',
@@ -606,6 +864,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#e9d6ff',
     borderWidth: 2,
     borderColor: '#d1b3ff',
+    minWidth: 80,
   },
   activeToggle: {
     backgroundColor: '#d1b3ff',
@@ -670,6 +929,127 @@ const styles = StyleSheet.create({
     padding: 10,
     backgroundColor: '#f0f0f0',
     borderRadius: 8
+  },
+  dailyItem: {
+    padding: 10,
+    borderRadius: 12,
+    marginBottom: 10,
+  },
+  dailyItemHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 5,
+  },
+  dailyItemInfo: {
+    flex: 1,
+  },
+  dailyItemTitle: {
+    fontFamily: 'PressStart2P',
+    fontSize: 12,
+    color: '#6e3abf',
+    marginBottom: 5,
+  },
+  dailyItemTime: {
+    fontFamily: 'PressStart2P',
+    fontSize: 10,
+    color: '#7a58b8',
+  },
+  dailyItemSubtitle: {
+    fontFamily: 'PressStart2P',
+    fontSize: 10,
+    color: '#a259c6',
+  },
+  dailySchedule: {
+    marginTop: 20,
+    padding: 10,
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    shadowColor: '#b292ff',
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  dailyTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#6e3abf',
+    marginBottom: 10,
+  },
+  dailyList: {
+    marginTop: 10,
+  },
+  shareButton: {
+    backgroundColor: '#6e3abf',
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 15,
+    marginLeft: 10,
+  },
+  shareButtonText: {
+    fontFamily: 'PressStart2P',
+    fontSize: 10,
+    color: '#fff',
+  },
+  eventCardTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#6e3abf',
+    marginBottom: 10,
+  },
+  inputContainer: {
+    marginBottom: 15,
+  },
+  inputLabel: {
+    fontFamily: 'PressStart2P',
+    fontSize: 12,
+    color: '#6e3abf',
+    marginBottom: 5,
+  },
+  timeContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  timeInput: {
+    flex: 1,
+  },
+  semesterContainer: {
+    marginBottom: 15,
+    zIndex: 3000,
+  },
+  dayContainer: {
+    marginBottom: 15,
+    zIndex: 2000,
+  },
+  picker: {
+    backgroundColor: '#f3c6f6',
+    borderColor: '#d1b3ff',
+    borderWidth: 2,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    height: 50,
+  },
+  pickerDropdown: {
+    backgroundColor: '#fff0fa',
+    borderColor: '#d1b3ff',
+    borderRadius: 12,
+  },
+  pickerText: {
+    color: '#a259c6',
+    fontFamily: 'PressStart2P',
+    fontSize: 12,
+  },
+  pickerPlaceholder: {
+    color: '#d1b3ff',
+    fontFamily: 'PressStart2P',
+    fontSize: 12,
+  },
+  noScheduleText: {
+    fontFamily: 'PressStart2P',
+    fontSize: 12,
+    color: '#a259c6',
+    textAlign: 'center',
+    marginTop: 20,
   },
 });
 
