@@ -6,7 +6,6 @@ import {
   KeyboardAvoidingView, Platform, Image, Alert, useWindowDimensions, Keyboard, TouchableWithoutFeedback, ActivityIndicator
 } from 'react-native';
 import * as Animatable from 'react-native-animatable';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useBudget } from './BudgetContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -19,8 +18,6 @@ const images = {
   rainbow: require('../assets/rainbow.gif'),
   pastelBg: require('../assets/pastel-pixel-bg.jpg'),
 };
-
-const Tab = createBottomTabNavigator();
 
 // Create AuthContext
 const AuthContext = React.createContext();
@@ -417,6 +414,7 @@ const BudgetTracker = () => {
   const { height } = useWindowDimensions();
   const isSmallScreen = height < 700;
   const { user } = useContext(AuthContext) || {}; // Safe access to context
+  const [activeTab, setActiveTab] = useState('Food');
 
   return (
     <SafeAreaView style={styles.bg}>
@@ -428,14 +426,22 @@ const BudgetTracker = () => {
           <Text style={[styles.title, { fontSize: Platform.OS === 'ios' ? 14 : 12 }]}>✨ Budget Tracker ✨</Text>
         </Animatable.View>
 
-        <Tab.Navigator screenOptions={{
-          tabBarStyle: styles.tabBar,
-          tabBarActiveTintColor: '#ff69b4',
-          tabBarInactiveTintColor: '#ffb6c1',
-        }}>
-          <Tab.Screen name="Food" component={FoodTab} options={{ headerShown: false }} />
-          <Tab.Screen name="Money" component={MoneyTab} options={{ headerShown: false }} />
-        </Tab.Navigator>
+        <View style={styles.tabContainer}>
+          <TouchableOpacity 
+            style={[styles.tabButton, activeTab === 'Food' && styles.activeTabButton]} 
+            onPress={() => setActiveTab('Food')}
+          >
+            <Text style={[styles.tabText, activeTab === 'Food' && styles.activeTabText]}>Food</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.tabButton, activeTab === 'Money' && styles.activeTabButton]} 
+            onPress={() => setActiveTab('Money')}
+          >
+            <Text style={[styles.tabText, activeTab === 'Money' && styles.activeTabText]}>Money</Text>
+          </TouchableOpacity>
+        </View>
+
+        {activeTab === 'Food' ? <FoodTab /> : <MoneyTab />}
       </ImageBackground>
     </SafeAreaView>
   );
@@ -448,18 +454,6 @@ const styles = StyleSheet.create({
   bg: {
     flex: 1,
     backgroundColor: '#fff0f5',
-  },
-  tabBar: {
-    backgroundColor: '#ffd6e7',
-    borderTopWidth: 0,
-    elevation: 0,
-    height: Platform.OS === 'ios' ? 70 : 60,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    shadowColor: '#ffb6c1',
-    shadowOffset: { width: 0, height: -5 },
-    shadowOpacity: 0.2,
-    shadowRadius: 10
   },
   header: {
     backgroundColor: 'rgba(255, 214, 231, 0.9)',
@@ -670,5 +664,30 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 2,
     borderColor: '#ff4757'
-  }
+  },
+  tabContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#ffd6e7',
+    padding: 10,
+    marginHorizontal: 15,
+    borderRadius: 20,
+    marginBottom: 10,
+  },
+  tabButton: {
+    flex: 1,
+    padding: 10,
+    alignItems: 'center',
+    borderRadius: 15,
+  },
+  activeTabButton: {
+    backgroundColor: '#ffb6c1',
+  },
+  tabText: {
+    fontFamily: 'PressStart2P',
+    fontSize: 12,
+    color: '#ff69b4',
+  },
+  activeTabText: {
+    color: '#fff',
+  },
 });

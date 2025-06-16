@@ -1,18 +1,17 @@
-import React, { useState, useContext, useEffect } from 'react';
-import { View, TextInput, Button, Text, StyleSheet, Image, Keyboard, TouchableOpacity, Alert } from 'react-native';
+import React, { useState, useContext } from 'react';
+import { View, TextInput, Text, StyleSheet, Image, Keyboard, TouchableOpacity, Alert } from 'react-native';
 import DropDownPicker from 'react-native-dropdown-picker';
 import { AuthContext } from './AuthContext';
 import { ScheduleContext } from './ScheduleContext';
 import { TaskContext } from './TaskContext';
 import { BudgetContext } from './BudgetContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useAuth } from './AuthContext';
 
 export default function LoginScreen({ navigation }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [open, setOpen] = useState(false);
-  const { login } = useAuth();
+  const { login } = useContext(AuthContext);
   const names = [
     { label: 'Maria', value: 'Maria' },
     { label: 'Reni', value: 'Reni' },
@@ -57,9 +56,14 @@ export default function LoginScreen({ navigation }) {
       return;
     }
 
-    // Proceed if password is correct
-    await login(userKey);
-    navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+    try {
+      // Proceed if password is correct
+      await login(userKey);
+      // Use replace instead of reset to avoid navigation state issues
+      navigation.replace('Home');
+    } catch (error) {
+      Alert.alert("Error", "Failed to login: " + error.message);
+    }
   };
 
   const handlePasswordChange = (text) => {
@@ -68,11 +72,6 @@ export default function LoginScreen({ navigation }) {
       Keyboard.dismiss();
     }
   };
-
-  useEffect(() => {
-    console.log("Current username state:", username);
-    console.log("Current password state:", password);
-  }, [username, password]);
 
   return (
     <View style={styles.container}>
@@ -88,6 +87,8 @@ export default function LoginScreen({ navigation }) {
         style={styles.dropdown}
         dropDownContainerStyle={styles.dropdownContainer}
         textStyle={styles.dropdownText}
+        zIndex={3000}
+        zIndexInverse={1000}
       />
       <TextInput
         placeholder="Password"
@@ -100,9 +101,6 @@ export default function LoginScreen({ navigation }) {
       />
       <TouchableOpacity style={styles.button} onPress={handleLogin}>
         <Text style={styles.buttonText}>Login</Text>
-      </TouchableOpacity>
-      <TouchableOpacity onPress={() => navigation.navigate('Signup')}>
-        <Text style={styles.linkText}>Don't have an account? Sign up</Text>
       </TouchableOpacity>
       <TouchableOpacity onPress={handleCleanup} style={styles.cleanupButton}>
         <Text style={styles.cleanupButtonText}>Clear All Data</Text>
@@ -182,11 +180,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#fff',
     textAlign: 'center',
-  },
-  linkText: {
-    color: '#f8a1d1',
-    fontSize: 14,
-    marginTop: 10,
   },
   cleanupButton: {
     marginTop: 20,

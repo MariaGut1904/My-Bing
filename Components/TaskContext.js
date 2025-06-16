@@ -1,8 +1,14 @@
-import React, { createContext, useState, useEffect } from 'react';
+import React, { createContext, useState, useEffect, useContext } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from './useAuth';
 
 export const TaskContext = createContext();
+
+export const useTasks = () => {
+  const context = useContext(TaskContext);
+  if (!context) throw new Error('useTasks must be used within TaskProvider');
+  return context;
+};
 
 export const TaskProvider = ({ children }) => {
   const [tasks, setTasks] = useState([]);
@@ -43,8 +49,12 @@ export const TaskProvider = ({ children }) => {
     setTasks(tasks.filter(task => task.id !== id));
   };
 
+  const resetTasks = () => {
+    setTasks([]);
+  };
+
   return (
-    <TaskContext.Provider value={{ tasks, addTask, deleteTask }}>
+    <TaskContext.Provider value={{ tasks, addTask, deleteTask, resetTasks }}>
       {children}
     </TaskContext.Provider>
   );

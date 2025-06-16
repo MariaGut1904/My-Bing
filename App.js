@@ -1,10 +1,11 @@
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { View, ActivityIndicator, StyleSheet, Platform, LogBox, StatusBar } from 'react-native';
 import { enableScreens } from 'react-native-screens';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { Ionicons } from '@expo/vector-icons';
 
 // Enable screens for better performance
 enableScreens(true);
@@ -23,7 +24,7 @@ LogBox.ignoreLogs([
 
 // Initialize navigation
 const Stack = createNativeStackNavigator();
-const Tab = createMaterialTopTabNavigator();
+const Tab = createBottomTabNavigator();
 
 // Import components directly
 import HomeScreen from './Components/HomeScreen';
@@ -43,69 +44,51 @@ const LoadingScreen = () => (
   </View>
 );
 
-function HomeTabs() {
+const TabNavigator = () => {
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#f8e1f4" />
-      <Tab.Navigator
-        screenOptions={{
-          tabBarStyle: {
-            backgroundColor: '#f8e1f4',
-            height: 70,
-            paddingTop: Platform.OS === 'ios' ? 30 : 25,
-            borderBottomWidth: 1,
-            borderBottomColor: '#d1b3ff',
-          },
-          tabBarItemStyle: {
-            justifyContent: 'flex-end',
-            alignItems: 'center',
-            paddingBottom: Platform.OS === 'ios' ? 50 : 25,
-          },
-          tabBarLabelStyle: {
-            fontSize: Platform.OS === 'ios' ? 8 : 9,
-            paddingBottom: 2,
-            color: '#a259c6',
-            includeFontPadding: false,
-            textAlign: 'center',
-          },
-          tabBarActiveTintColor: '#a259c6',
-          tabBarInactiveTintColor: '#d291bc',
-          tabBarIndicatorStyle: {
-            backgroundColor: '#d1b3ff',
-            height: 3,
-          },
-          animationEnabled: false,
-          lazy: true,
-          freezeOnBlur: true,
-          unmountOnBlur: true,
-        }}
-      >
-        <Tab.Screen 
-          name="Home" 
-          component={HomeScreen}
-          options={{ lazy: true }}
-        />
-        <Tab.Screen 
-          name="Budget" 
-          component={BudgetTracker}
-          options={{ lazy: true }}
-        />
-        <Tab.Screen 
-          name="Schedule" 
-          component={SchedulePlanner}
-          options={{ lazy: true }}
-        />
-        <Tab.Screen 
-          name="Avatar" 
-          component={AvatarBuilder}
-          options={{ lazy: true }}
-        />
-      </Tab.Navigator>
-    </View>
-  );
-}
+    <Tab.Navigator
+      screenOptions={({ route }) => ({
+        tabBarIcon: ({ focused, color, size }) => {
+          let iconName;
 
-export default function App() {
+          if (route.name === 'Home') {
+            iconName = focused ? 'home' : 'home-outline';
+          } else if (route.name === 'Budget') {
+            iconName = focused ? 'wallet' : 'wallet-outline';
+          } else if (route.name === 'Schedule') {
+            iconName = focused ? 'calendar' : 'calendar-outline';
+          } else if (route.name === 'Avatar') {
+            iconName = focused ? 'person' : 'person-outline';
+          }
+
+          return <Ionicons name={iconName} size={size} color={color} />;
+        },
+        tabBarStyle: {
+          backgroundColor: '#f8e1f4',
+          height: 70,
+          paddingTop: 10,
+          paddingBottom: Platform.OS === 'ios' ? 20 : 10,
+          borderTopWidth: 1,
+          borderTopColor: '#d1b3ff',
+        },
+        tabBarLabelStyle: {
+          fontSize: 12,
+          color: '#a259c6',
+        },
+        tabBarActiveTintColor: '#a259c6',
+        tabBarInactiveTintColor: '#d291bc',
+        headerShown: false,
+      })}
+    >
+      <Tab.Screen name="Home" component={HomeScreen} />
+      <Tab.Screen name="Budget" component={BudgetTracker} />
+      <Tab.Screen name="Schedule" component={SchedulePlanner} />
+      <Tab.Screen name="Avatar" component={AvatarBuilder} />
+    </Tab.Navigator>
+  );
+};
+
+const App = () => {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <AuthProvider>
@@ -120,20 +103,10 @@ export default function App() {
                     screenOptions={{
                       headerShown: false,
                       animation: 'none',
-                      freezeOnBlur: true,
-                      unmountOnBlur: true,
                     }}
                   >
-                    <Stack.Screen 
-                      name="Login" 
-                      component={LoginScreen}
-                      options={{ animationEnabled: false }}
-                    />
-                    <Stack.Screen 
-                      name="Home" 
-                      component={HomeTabs}
-                      options={{ animationEnabled: false }}
-                    />
+                    <Stack.Screen name="Login" component={LoginScreen} />
+                    <Stack.Screen name="Home" component={TabNavigator} />
                   </Stack.Navigator>
                 </View>
               </NavigationContainer>
@@ -143,7 +116,7 @@ export default function App() {
       </AuthProvider>
     </GestureHandlerRootView>
   );
-}
+};
 
 const styles = StyleSheet.create({
   bg: {
@@ -156,4 +129,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8e1f4',
   },
 });
+
+export default App;
 

@@ -2,7 +2,7 @@
   "name": "myawesomeapp",
   "license": "0BSD",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "node_modules/expo/AppEntry.js",
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
@@ -10,14 +10,16 @@
     "web": "expo start --web"
   },
   "dependencies": {
+    "@babel/runtime": "^7.27.6",
     "@react-native-async-storage/async-storage": "2.1.2",
     "@react-native-community/netinfo": "11.4.1",
     "@react-native-picker/picker": "2.11.0",
-    "@react-navigation/bottom-tabs": "^6.5.11",
-    "@react-navigation/material-top-tabs": "^6.6.5",
-    "@react-navigation/native": "^6.1.9",
-    "@react-navigation/native-stack": "^6.9.17",
+    "@react-navigation/bottom-tabs": "6.5.11",
+    "@react-navigation/material-top-tabs": "6.6.5",
+    "@react-navigation/native": "6.1.9",
+    "@react-navigation/native-stack": "6.9.17",
     "expo": "~53.0.0",
+    "expo-font": "~13.3.1",
     "expo-status-bar": "~2.2.3",
     "firebase": "^11.9.1",
     "react": "19.0.0",
@@ -25,14 +27,15 @@
     "react-error-boundary": "^6.0.0",
     "react-native": "0.79.3",
     "react-native-animatable": "^1.4.0",
-    "react-native-calendars": "^1.1300.0",
+    "react-native-calendars": "1.1300.0",
     "react-native-dropdown-picker": "^5.4.6",
     "react-native-gesture-handler": "~2.24.0",
     "react-native-pager-view": "6.7.1",
     "react-native-reanimated": "~3.17.4",
     "react-native-safe-area-context": "5.4.0",
     "react-native-screens": "~4.11.1",
-    "react-native-tab-view": "^3.5.2"
+    "react-native-tab-view": "3.5.2",
+    "react-native-vector-icons": "10.0.3"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0"

@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Image, ImageBackground, TouchableOpacity, ScrollView, Alert, Modal, TextInput } from 'react-native';
 import * as Animatable from 'react-native-animatable';
 import SchedulePlanner from './SchedulePlanner';
 import { useSchedule } from './ScheduleContext';
-import { useTasks, useContext as TaskContext } from './TaskContext';
+import { useTasks } from './TaskContext';
 import { useBudget } from './BudgetContext';
 import { useAuth } from './AuthContext';
 
@@ -12,7 +12,6 @@ const HomeScreen = ({ navigation }) => {
   const { tasks, addTask, deleteTask, resetTasks } = useTasks();
   const { budgetData, resetBudget } = useBudget();
   const { logout } = useAuth();
-  const { resetTasks: taskContextResetTasks } = useContext(TaskContext);
   const [isTaskModalVisible, setIsTaskModalVisible] = useState(false);
   const [newTaskText, setNewTaskText] = useState('');
 
@@ -22,7 +21,6 @@ const HomeScreen = ({ navigation }) => {
     resetTasks();
     resetSchedule();
     resetBudget();
-    taskContextResetTasks();
   };
 
   // Filter events for today and tomorrow
