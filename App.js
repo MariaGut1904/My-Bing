@@ -2,9 +2,7 @@ import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
-import { useFonts } from 'expo-font';
-import { View, ActivityIndicator, StyleSheet, Platform, LogBox } from 'react-native';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { View, ActivityIndicator, StyleSheet, Platform, LogBox, StatusBar } from 'react-native';
 import { enableScreens } from 'react-native-screens';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
@@ -41,13 +39,14 @@ import { BudgetProvider } from './Components/BudgetContext';
 // Loading component
 const LoadingScreen = () => (
   <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f8e1f4' }}>
-    <ActivityIndicator size="large" color="#d291bc" />
+    <ActivityIndicator size={36} color="#d291bc" />
   </View>
 );
 
 function HomeTabs() {
   return (
-    <View style={{ flex: 1 }}>
+    <View style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#f8e1f4" />
       <Tab.Navigator
         screenOptions={{
           tabBarStyle: {
@@ -63,7 +62,6 @@ function HomeTabs() {
             paddingBottom: Platform.OS === 'ios' ? 50 : 25,
           },
           tabBarLabelStyle: {
-            fontFamily: 'PressStart2P',
             fontSize: Platform.OS === 'ios' ? 8 : 9,
             paddingBottom: 2,
             color: '#a259c6',
@@ -108,56 +106,52 @@ function HomeTabs() {
 }
 
 export default function App() {
-  const [fontsLoaded] = useFonts({
-    'PressStart2P': require('./assets/fonts/PressStart2P-Regular.ttf'),
-  });
-
-  if (!fontsLoaded) {
-    return <LoadingScreen />;
-  }
-
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaProvider>
-        <AuthProvider>
-          <TaskProvider>
-            <ScheduleProvider>
-              <BudgetProvider>
-                <NavigationContainer>
-                  <View style={styles.bg}>
-                    <Stack.Navigator
-                      initialRouteName="Login"
-                      screenOptions={{
-                        headerShown: false,
-                        animation: 'none',
-                        freezeOnBlur: true,
-                        unmountOnBlur: true,
-                      }}
-                    >
-                      <Stack.Screen 
-                        name="Login" 
-                        component={LoginScreen}
-                        options={{ animationEnabled: false }}
-                      />
-                      <Stack.Screen 
-                        name="Home" 
-                        component={HomeTabs}
-                        options={{ animationEnabled: false }}
-                      />
-                    </Stack.Navigator>
-                  </View>
-                </NavigationContainer>
-              </BudgetProvider>
-            </ScheduleProvider>
-          </TaskProvider>
-        </AuthProvider>
-      </SafeAreaProvider>
+      <AuthProvider>
+        <TaskProvider>
+          <ScheduleProvider>
+            <BudgetProvider>
+              <NavigationContainer>
+                <View style={styles.bg}>
+                  <StatusBar barStyle="dark-content" backgroundColor="#f8e1f4" />
+                  <Stack.Navigator
+                    initialRouteName="Login"
+                    screenOptions={{
+                      headerShown: false,
+                      animation: 'none',
+                      freezeOnBlur: true,
+                      unmountOnBlur: true,
+                    }}
+                  >
+                    <Stack.Screen 
+                      name="Login" 
+                      component={LoginScreen}
+                      options={{ animationEnabled: false }}
+                    />
+                    <Stack.Screen 
+                      name="Home" 
+                      component={HomeTabs}
+                      options={{ animationEnabled: false }}
+                    />
+                  </Stack.Navigator>
+                </View>
+              </NavigationContainer>
+            </BudgetProvider>
+          </ScheduleProvider>
+        </TaskProvider>
+      </AuthProvider>
     </GestureHandlerRootView>
   );
 }
 
 const styles = StyleSheet.create({
   bg: {
+    flex: 1,
+    backgroundColor: '#f8e1f4',
+    paddingTop: Platform.OS === 'ios' ? 50 : StatusBar.currentHeight,
+  },
+  container: {
     flex: 1,
     backgroundColor: '#f8e1f4',
   },

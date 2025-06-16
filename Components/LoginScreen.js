@@ -20,6 +20,16 @@ export default function LoginScreen({ navigation }) {
     { label: 'Sheila', value: 'Sheila' },
   ];
 
+  const handleCleanup = async () => {
+    try {
+      const keys = await AsyncStorage.getAllKeys();
+      await AsyncStorage.multiRemove(keys);
+      Alert.alert('Success', 'All app data has been cleared successfully');
+    } catch (error) {
+      Alert.alert('Error', 'Failed to clear data: ' + error.message);
+    }
+  };
+
   const handleLogin = async () => {
     if (!username) {
       Alert.alert("Error", "Please select your name.");
@@ -94,6 +104,9 @@ export default function LoginScreen({ navigation }) {
       <TouchableOpacity onPress={() => navigation.navigate('Signup')}>
         <Text style={styles.linkText}>Don't have an account? Sign up</Text>
       </TouchableOpacity>
+      <TouchableOpacity onPress={handleCleanup} style={styles.cleanupButton}>
+        <Text style={styles.cleanupButtonText}>Clear All Data</Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -124,7 +137,6 @@ const styles = StyleSheet.create({
     borderColor: '#f8a1d1',
     backgroundColor: '#fff0fa',
     color: '#a259c6',
-    fontFamily: 'PressStart2P',
     width: 260,
     fontSize: 16,
     letterSpacing: 1,
@@ -137,7 +149,6 @@ const styles = StyleSheet.create({
     fontSize: 26,
     marginBottom: 18,
     textAlign: 'center',
-    fontFamily: 'PressStart2P',
     color: '#f8a1d1',
     letterSpacing: 2,
     textShadowColor: '#fff0fa',
@@ -159,7 +170,6 @@ const styles = StyleSheet.create({
   },
   dropdownText: {
     color: '#a259c6',
-    fontFamily: 'PressStart2P',
     fontSize: 15,
   },
   button: {
@@ -170,14 +180,22 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     fontSize: 16,
-    fontFamily: 'PressStart2P',
     color: '#fff',
     textAlign: 'center',
   },
   linkText: {
     color: '#f8a1d1',
-    fontFamily: 'PressStart2P',
     fontSize: 14,
     marginTop: 10,
+  },
+  cleanupButton: {
+    marginTop: 20,
+    padding: 10,
+    backgroundColor: '#ff6b6b',
+    borderRadius: 8,
+  },
+  cleanupButtonText: {
+    color: '#fff',
+    fontSize: 12,
   },
 }); 

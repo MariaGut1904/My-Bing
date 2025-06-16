@@ -202,7 +202,7 @@ const FoodTab = () => {
   if (isLoading || contextLoading) {
     return (
       <View style={[styles.content, { justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="large" color="#ff69b4" />
+        <ActivityIndicator size={36} color="#ff69b4" />
       </View>
     );
   }
