@@ -1,52 +1,54 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useAuth } from './useAuth';
+import { useAuth } from './AuthContext';
 
 export const TaskContext = createContext();
 
-export const useTasks = () => {
-  const context = useContext(TaskContext);
-  if (!context) throw new Error('useTasks must be used within TaskProvider');
-  return context;
-};
-
 export const TaskProvider = ({ children }) => {
-  const [tasks, setTasks] = useState([]);
   const { currentUser } = useAuth();
+  const [tasks, setTasks] = useState([]);
 
   // Load tasks for the current user
   useEffect(() => {
     const loadTasks = async () => {
       if (!currentUser) return;
       try {
-        const savedTasks = await AsyncStorage.getItem(`tasks_${currentUser}`);
-        if (savedTasks) setTasks(JSON.parse(savedTasks));
+        const userTasks = await AsyncStorage.getItem(`tasks_${currentUser}`);
+        if (userTasks) {
+          setTasks(JSON.parse(userTasks));
+        }
       } catch (error) {
-        console.error('Failed to load tasks:', error);
+        console.error('Error loading tasks:', error);
       }
     };
     loadTasks();
   }, [currentUser]);
 
-  // Save tasks when they change
+  // Save tasks whenever they change
   useEffect(() => {
-    if (!currentUser) return;
-    AsyncStorage.setItem(`tasks_${currentUser}`, JSON.stringify(tasks));
+    const saveTasks = async () => {
+      if (!currentUser) return;
+      try {
+        await AsyncStorage.setItem(`tasks_${currentUser}`, JSON.stringify(tasks));
+      } catch (error) {
+        console.error('Error saving tasks:', error);
+      }
+    };
+    saveTasks();
   }, [tasks, currentUser]);
 
-  // Optional: Add error boundary to TaskContext
-  useEffect(() => {
-    if (!currentUser && tasks.length > 0) {
-      setTasks([]); // Clear tasks on logout
-    }
-  }, [currentUser]);
-
   const addTask = (text) => {
-    setTasks([...tasks, { id: Date.now().toString(), text }]);
+    const newTask = {
+      id: Date.now().toString(),
+      text: text,
+      completed: false,
+      createdAt: new Date().toISOString()
+    };
+    setTasks(prevTasks => [...prevTasks, newTask]);
   };
 
-  const deleteTask = (id) => {
-    setTasks(tasks.filter(task => task.id !== id));
+  const deleteTask = (taskId) => {
+    setTasks(prevTasks => prevTasks.filter(task => task.id !== taskId));
   };
 
   const resetTasks = () => {
@@ -58,4 +60,10 @@ export const TaskProvider = ({ children }) => {
       {children}
     </TaskContext.Provider>
   );
+};
+
+export const useTasks = () => {
+  const context = useContext(TaskContext);
+  if (!context) throw new Error('useTasks must be used within TaskProvider');
+  return context;
 };

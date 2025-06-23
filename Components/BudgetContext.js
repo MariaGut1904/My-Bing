@@ -1,92 +1,86 @@
-import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
+import React, { createContext, useState, useEffect, useContext } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuth } from './AuthContext';
 
 const BudgetContext = createContext();
 
 export const BudgetProvider = ({ children }) => {
-  const [budgetData, setBudgetData] = useState({ total: 0, percentage: 0 });
-  const [currentUserId, setCurrentUserId] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  // Memoize the updateBudget function to prevent unnecessary re-renders
-  const updateBudget = useCallback((totalSpent, totalBudget) => {
-    try {
-      const percentage = totalBudget > 0 ? Math.round((totalSpent / totalBudget) * 100) : 0;
-      setBudgetData(prev => ({ ...prev, total: totalBudget, percentage }));
-    } catch (error) {
-      console.error('Failed to update budget:', error);
+  const { currentUser } = useAuth();
+  const [budget, setBudget] = useState({
+    food: [],
+    money: [],
+    limits: {
+      food: 0,
+      money: 0
     }
-  }, []);
+  });
 
-  // Load budget data
+  // Load budget for the current user
   useEffect(() => {
-    let isMounted = true;
     const loadBudget = async () => {
-      if (!currentUserId) {
-        if (isMounted) {
-          setBudgetData({ total: 0, percentage: 0 });
-          setIsLoading(false);
-        }
-        return;
-      }
-
+      if (!currentUser) return;
       try {
-        setIsLoading(true);
-        const savedBudget = await AsyncStorage.getItem(`budget_${currentUserId}`);
-        if (isMounted) {
-          setBudgetData(savedBudget ? JSON.parse(savedBudget) : { total: 0, percentage: 0 });
+        const userBudget = await AsyncStorage.getItem(`budget_${currentUser}`);
+        if (userBudget) {
+          setBudget(JSON.parse(userBudget));
         }
       } catch (error) {
-        console.error('Failed to load budget:', error);
-        if (isMounted) {
-          setBudgetData({ total: 0, percentage: 0 });
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
+        console.error('Error loading budget:', error);
       }
     };
-
     loadBudget();
-    return () => {
-      isMounted = false;
-    };
-  }, [currentUserId]);
+  }, [currentUser]);
 
-  // Save budget data
+  // Save budget whenever it changes
   useEffect(() => {
     const saveBudget = async () => {
-      if (!currentUserId) return;
-      
+      if (!currentUser) return;
       try {
-        await AsyncStorage.setItem(`budget_${currentUserId}`, JSON.stringify(budgetData));
+        await AsyncStorage.setItem(`budget_${currentUser}`, JSON.stringify(budget));
       } catch (error) {
-        console.error('Failed to save budget:', error);
+        console.error('Error saving budget:', error);
       }
     };
-
     saveBudget();
-  }, [budgetData, currentUserId]);
+  }, [budget, currentUser]);
 
-  const resetBudget = useCallback(() => {
-    try {
-      setBudgetData({ total: 0, percentage: 0 });
-    } catch (error) {
-      console.error('Failed to reset budget:', error);
-    }
-  }, []);
+  const addExpense = (category, expense) => {
+    setBudget(prevBudget => ({
+      ...prevBudget,
+      [category]: [...prevBudget[category], { ...expense, id: Date.now().toString() }]
+    }));
+  };
 
-  const value = {
-    budgetData,
-    updateBudget,
-    setCurrentUserId,
-    resetBudget,
-    isLoading
+  const deleteExpense = (category, expenseId) => {
+    setBudget(prevBudget => ({
+      ...prevBudget,
+      [category]: prevBudget[category].filter(expense => expense.id !== expenseId)
+    }));
+  };
+
+  const setBudgetLimit = (category, limit) => {
+    setBudget(prevBudget => ({
+      ...prevBudget,
+      limits: {
+        ...prevBudget.limits,
+        [category]: limit
+      }
+    }));
+  };
+
+  const resetBudget = () => {
+    setBudget({
+      food: [],
+      money: [],
+      limits: {
+        food: 0,
+        money: 0
+      }
+    });
   };
 
   return (
-    <BudgetContext.Provider value={value}>
+    <BudgetContext.Provider value={{ budget, addExpense, deleteExpense, setBudgetLimit, resetBudget }}>
       {children}
     </BudgetContext.Provider>
   );

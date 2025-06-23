@@ -41,7 +41,7 @@ const SchedulePlanner = () => {
           const parsedClasses = JSON.parse(savedClasses);
           console.log('Parsed classes:', parsedClasses);
           
-          // Only load classes that are either created by current user or shared
+          // Load classes that are either created by current user or shared
           const relevantClasses = parsedClasses.filter(cls => {
             const isRelevant = cls.creator === currentUser || cls.isShared;
             console.log('Class:', cls.name, 'isRelevant:', isRelevant, 'creator:', cls.creator, 'isShared:', cls.isShared);
@@ -56,17 +56,25 @@ const SchedulePlanner = () => {
           const newMarkedDates = {};
           relevantClasses.forEach(item => {
             if (item.isRecurring) {
-              const semesterDates = getSemesterDates(semester);
+              const semesterDates = getSemesterDates(item.semester);
               let currentDate = new Date(semesterDates.start);
               while (currentDate <= semesterDates.end) {
                 if (currentDate.getDay() === item.day) {
                   const dateStr = currentDate.toISOString().split('T')[0];
-                  newMarkedDates[dateStr] = { marked: true, dotColor: '#a259c6' };
+                  newMarkedDates[dateStr] = { 
+                    marked: true, 
+                    dotColor: item.semester === semester ? '#a259c6' : '#d1b3ff',
+                    selected: item.semester === semester
+                  };
                 }
                 currentDate.setDate(currentDate.getDate() + 1);
               }
             } else {
-              newMarkedDates[item.date] = { marked: true, dotColor: '#a259c6' };
+              newMarkedDates[item.date] = { 
+                marked: true, 
+                dotColor: item.semester === semester ? '#a259c6' : '#d1b3ff',
+                selected: item.semester === semester
+              };
             }
           });
           setMarkedDates(newMarkedDates);
@@ -177,6 +185,50 @@ const SchedulePlanner = () => {
       }
     }
 
+    // For recurring classes, we don't need to validate the selected date
+    if (!isEvent) {
+      const newItem = {
+        id: Date.now().toString(),
+        type: 'class',
+        name: className,
+        startTime,
+        endTime,
+        day: day,
+        isRecurring: true,
+        creator: currentUser,
+        semester: semester
+      };
+
+      const updatedClasses = [...allClasses, newItem];
+      setAllClasses(updatedClasses);
+      setScheduleData(updatedClasses);
+      
+      // Update marked dates
+      const newMarkedDates = { ...markedDates };
+      const semesterDates = getSemesterDates(semester);
+      let currentDate = new Date(semesterDates.start);
+      while (currentDate <= semesterDates.end) {
+        if (currentDate.getDay() === day) {
+          const dateStr = currentDate.toISOString().split('T')[0];
+          newMarkedDates[dateStr] = { 
+            marked: true, 
+            dotColor: '#a259c6',
+            selected: true
+          };
+        }
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+      setMarkedDates(newMarkedDates);
+      
+      // Reset form
+      setClassName('');
+      setStartTime('');
+      setEndTime('');
+      setDay(null);
+      return;
+    }
+
+    // For one-time events, validate the selected date
     const semesterDates = getSemesterDates(semester);
     const selectedDateObj = new Date(selectedDate);
     
@@ -189,21 +241,16 @@ const SchedulePlanner = () => {
       return;
     }
 
-    const itemDay = isEvent ? selectedDateObj.getDay() : day;
-    const dateStr = selectedDate.split('T')[0]; // Format: YYYY-MM-DD
-    
     const newItem = {
       id: Date.now().toString(),
-      type: isEvent ? 'event' : 'class',
-      name: isEvent ? eventDescription : className,
+      type: 'event',
+      name: eventDescription,
       startTime,
       endTime,
-      day: itemDay,
-      date: dateStr,
-      isRecurring: !isEvent,
+      date: selectedDate,
+      isRecurring: false,
       creator: currentUser,
-      semester: semester,
-      ...(isEvent ? { description: eventDescription } : { className })
+      semester: semester
     };
 
     const updatedClasses = [...allClasses, newItem];
@@ -212,28 +259,18 @@ const SchedulePlanner = () => {
     
     // Update marked dates
     const newMarkedDates = { ...markedDates };
-    if (isEvent) {
-      newMarkedDates[dateStr] = { marked: true, dotColor: '#a259c6' };
-    } else {
-      // For recurring classes, mark all dates in the semester
-      const semesterDates = getSemesterDates(semester);
-      let currentDate = new Date(semesterDates.start);
-      while (currentDate <= semesterDates.end) {
-        if (currentDate.getDay() === itemDay) {
-          const dateStr = currentDate.toISOString().split('T')[0];
-          newMarkedDates[dateStr] = { marked: true, dotColor: '#a259c6' };
-        }
-        currentDate.setDate(currentDate.getDate() + 1);
-      }
-    }
+    newMarkedDates[selectedDate] = { 
+      marked: true, 
+      dotColor: '#a259c6',
+      selected: true
+    };
     setMarkedDates(newMarkedDates);
     
     // Reset form
-    setClassName('');
     setEventDescription('');
     setStartTime('');
     setEndTime('');
-    setDay(null);
+    setSelectedDate(null);
   };
 
   const handleDayPress = (day) => {
@@ -272,7 +309,8 @@ const SchedulePlanner = () => {
       cls.name === item.name && 
       cls.startTime === item.startTime && 
       cls.endTime === item.endTime &&
-      cls.day === item.day
+      cls.day === item.day &&
+      cls.semester === item.semester
     );
 
     if (isAlreadyShared) {
@@ -292,7 +330,8 @@ const SchedulePlanner = () => {
       isShared: true,
       sharedBy: currentUser,
       date: item.date,
-      day: item.day
+      day: item.day,
+      semester: item.semester
     };
 
     try {
@@ -315,18 +354,26 @@ const SchedulePlanner = () => {
       const newMarkedDates = { ...markedDates };
       if (item.isRecurring) {
         // For recurring classes, mark all dates in the semester
-        const semesterDates = getSemesterDates(semester);
+        const semesterDates = getSemesterDates(item.semester);
         let currentDate = new Date(semesterDates.start);
         while (currentDate <= semesterDates.end) {
           if (currentDate.getDay() === item.day) {
             const dateStr = currentDate.toISOString().split('T')[0];
-            newMarkedDates[dateStr] = { marked: true, dotColor: '#a259c6' };
+            newMarkedDates[dateStr] = { 
+              marked: true, 
+              dotColor: item.semester === semester ? '#a259c6' : '#d1b3ff',
+              selected: item.semester === semester
+            };
           }
           currentDate.setDate(currentDate.getDate() + 1);
         }
       } else {
         // For one-time events, mark the specific date
-        newMarkedDates[item.date] = { marked: true, dotColor: '#a259c6' };
+        newMarkedDates[item.date] = { 
+          marked: true, 
+          dotColor: item.semester === semester ? '#a259c6' : '#d1b3ff',
+          selected: item.semester === semester
+        };
       }
       setMarkedDates(newMarkedDates);
 
@@ -435,13 +482,21 @@ const SchedulePlanner = () => {
         while (currentDate <= semesterDates.end) {
           if (currentDate.getDay() === cls.day) {
             const dateStr = currentDate.toISOString().split('T')[0];
-            marked[dateStr] = { marked: true, dotColor: '#a259c6' };
+            marked[dateStr] = { 
+              marked: true, 
+              dotColor: cls.semester === semester ? '#a259c6' : '#d1b3ff',
+              selected: cls.semester === semester
+            };
           }
           currentDate.setDate(currentDate.getDate() + 1);
         }
       } else {
         // For one-time events, mark the specific date
-        marked[cls.date] = { marked: true, dotColor: '#a259c6' };
+        marked[cls.date] = { 
+          marked: true, 
+          dotColor: cls.semester === semester ? '#a259c6' : '#d1b3ff',
+          selected: cls.semester === semester
+        };
       }
     });
     

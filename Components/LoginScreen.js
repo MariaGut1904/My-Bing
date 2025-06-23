@@ -1,194 +1,217 @@
-import React, { useState, useContext } from 'react';
-import { View, TextInput, Text, StyleSheet, Image, Keyboard, TouchableOpacity, Alert } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ImageBackground, Image, Alert } from 'react-native';
+import { useAuth } from './AuthContext';
+import { useTutorial } from './TutorialContext';
+import { useBudget } from './BudgetContext';
+import { nuclearDataCleanup } from '../utils/cleanData';
 import DropDownPicker from 'react-native-dropdown-picker';
-import { AuthContext } from './AuthContext';
-import { ScheduleContext } from './ScheduleContext';
-import { TaskContext } from './TaskContext';
-import { BudgetContext } from './BudgetContext';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
-export default function LoginScreen({ navigation }) {
+const LoginScreen = ({ navigation }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
   const [open, setOpen] = useState(false);
-  const { login } = useContext(AuthContext);
-  const names = [
+  const { login } = useAuth();
+  const { resetTutorial } = useTutorial();
+  const { resetBudget } = useBudget();
+
+  const users = [
     { label: 'Maria', value: 'Maria' },
     { label: 'Reni', value: 'Reni' },
     { label: 'Luna', value: 'Luna' },
     { label: 'Sheila', value: 'Sheila' },
   ];
 
-  const handleCleanup = async () => {
+  const handleLogin = async () => {
     try {
-      const keys = await AsyncStorage.getAllKeys();
-      await AsyncStorage.multiRemove(keys);
-      Alert.alert('Success', 'All app data has been cleared successfully');
+      console.log('Attempting login...');
+      if (!username) {
+        setError('Please select your name');
+        return;
+      }
+      if (!password) {
+        setError('Please enter your password');
+        return;
+      }
+
+      // Check password based on username
+      const validPasswords = {
+        'Maria': '0919',
+        'Reni': '0312',
+        'Luna': '0924',
+        'Sheila': '9012'
+      };
+
+      if (validPasswords[username] !== password) {
+        setError('Incorrect password');
+        return;
+      }
+
+      await login(username);
+      console.log('Login successful, resetting tutorial...');
+      await resetTutorial();
+      console.log('Tutorial reset complete');
+    } catch (error) {
+      console.error('Login error:', error);
+      setError(error.message);
+    }
+  };
+
+  const handleClearData = async () => {
+    try {
+      await nuclearDataCleanup();
+      Alert.alert('Success', 'All app data has been cleared!');
     } catch (error) {
       Alert.alert('Error', 'Failed to clear data: ' + error.message);
     }
   };
 
-  const handleLogin = async () => {
-    if (!username) {
-      Alert.alert("Error", "Please select your name.");
-      return;
-    }
-
-    // Password validation (ensure keys are lowercase)
-    const validPasswords = {
-      maria: '0919',
-      reni: '1234',
-      luna: '5678',
-      sheila: '4321'
-    };
-
-    const userKey = username.toLowerCase(); // Force lowercase
-
-    if (!password || password.length !== 4) {
-      Alert.alert("Error", "Password must be 4 digits.");
-      return;
-    }
-
-    if (password !== validPasswords[userKey]) {
-      Alert.alert("Error", "Incorrect password.");
-      setPassword(''); // Clear the input
-      return;
-    }
-
-    try {
-      // Proceed if password is correct
-      await login(userKey);
-      // Use replace instead of reset to avoid navigation state issues
-      navigation.replace('Home');
-    } catch (error) {
-      Alert.alert("Error", "Failed to login: " + error.message);
-    }
-  };
-
-  const handlePasswordChange = (text) => {
-    setPassword(text);
-    if (text.length === 4) {
-      Keyboard.dismiss();
-    }
-  };
-
   return (
-    <View style={styles.container}>
-      <Image source={require('../assets/pixel-heart.gif')} style={styles.heartIcon} />
-      <Text style={styles.title}>Login</Text>
-      <DropDownPicker
-        open={open}
-        value={username}
-        items={names}
-        setOpen={setOpen}
-        setValue={setUsername}
-        placeholder="Select your name"
-        style={styles.dropdown}
-        dropDownContainerStyle={styles.dropdownContainer}
-        textStyle={styles.dropdownText}
-        zIndex={3000}
-        zIndexInverse={1000}
-      />
-      <TextInput
-        placeholder="Password"
-        value={password}
-        onChangeText={handlePasswordChange}
-        style={styles.input}
-        secureTextEntry
-        keyboardType="numeric"
-        maxLength={4}
-      />
-      <TouchableOpacity style={styles.button} onPress={handleLogin}>
-        <Text style={styles.buttonText}>Login</Text>
-      </TouchableOpacity>
-      <TouchableOpacity onPress={handleCleanup} style={styles.cleanupButton}>
-        <Text style={styles.cleanupButtonText}>Clear All Data</Text>
-      </TouchableOpacity>
-    </View>
+    <ImageBackground
+      source={require('../assets/pastel-pixel-bg.jpg')}
+      style={styles.background}
+      resizeMode="cover"
+    >
+      <View style={styles.container}>
+        <Image
+          source={require('../assets/kawaii-star.gif')}
+          style={styles.logo}
+        />
+        <Text style={styles.title}>✨ Welcome Back! ✨</Text>
+        
+        {error ? <Text style={styles.errorText}>{error}</Text> : null}
+        
+        <View style={styles.dropdownContainer}>
+          <DropDownPicker
+            open={open}
+            value={username}
+            items={users}
+            setOpen={setOpen}
+            setValue={setUsername}
+            placeholder="Select your name"
+            style={styles.dropdown}
+            dropDownContainerStyle={styles.dropdownList}
+            textStyle={styles.dropdownText}
+            zIndex={3000}
+            zIndexInverse={1000}
+          />
+        </View>
+        
+        <TextInput
+          style={styles.input}
+          placeholder="Password"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+        />
+        
+        <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
+          <Text style={styles.buttonText}>Login ✨</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.clearButton} onPress={handleClearData}>
+          <Text style={styles.clearButtonText}>Clear All Data</Text>
+        </TouchableOpacity>
+      </View>
+    </ImageBackground>
   );
-}
+};
 
 const styles = StyleSheet.create({
+  background: {
+    flex: 1,
+  },
   container: {
     flex: 1,
     justifyContent: 'center',
-    padding: 24,
-    backgroundColor: '#fff',
     alignItems: 'center',
-    borderRadius: 24,
-    shadowColor: '#f8a1d1',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
+    padding: 20,
   },
-  heartIcon: {
-    width: 48,
-    height: 48,
-    marginBottom: 10,
-  },
-  input: {
-    borderWidth: 2,
-    marginBottom: 14,
-    padding: 10,
-    borderRadius: 12,
-    borderColor: '#f8a1d1',
-    backgroundColor: '#fff0fa',
-    color: '#a259c6',
-    width: 260,
-    fontSize: 16,
-    letterSpacing: 1,
-    shadowColor: '#f8a1d1',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
+  logo: {
+    width: 100,
+    height: 100,
+    marginBottom: 20,
   },
   title: {
-    fontSize: 26,
-    marginBottom: 18,
+    fontFamily: 'PressStart2P',
+    fontSize: 24,
+    color: '#ff69b4',
+    marginBottom: 30,
     textAlign: 'center',
-    color: '#f8a1d1',
-    letterSpacing: 2,
-    textShadowColor: '#fff0fa',
-    textShadowOffset: { width: 2, height: 2 },
-    textShadowRadius: 3,
-  },
-  dropdown: {
-    borderWidth: 2,
-    borderColor: '#f8a1d1',
-    borderRadius: 12,
-    backgroundColor: '#fff0fa',
-    marginBottom: 14,
-    width: 260,
+    textShadowColor: 'rgba(255,255,255,0.7)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
   },
   dropdownContainer: {
-    borderColor: '#f8a1d1',
-    backgroundColor: '#fff0fa',
-    width: 260,
+    width: '100%',
+    marginBottom: 10,
+    zIndex: 1000,
   },
-  dropdownText: {
-    color: '#a259c6',
-    fontSize: 15,
-  },
-  button: {
-    backgroundColor: '#f8a1d1',
-    padding: 14,
-    borderRadius: 12,
-    width: 260,
-  },
-  buttonText: {
-    fontSize: 16,
-    color: '#fff',
-    textAlign: 'center',
-  },
-  cleanupButton: {
-    marginTop: 20,
-    padding: 10,
-    backgroundColor: '#ff6b6b',
-    borderRadius: 8,
-  },
-  cleanupButtonText: {
-    color: '#fff',
+  dropdown: {
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderWidth: 2,
+    borderColor: '#ffb6c1',
+    borderRadius: 10,
+    fontFamily: 'PressStart2P',
     fontSize: 12,
   },
-}); 
+  dropdownList: {
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderWidth: 2,
+    borderColor: '#ffb6c1',
+    borderRadius: 10,
+  },
+  dropdownText: {
+    fontFamily: 'PressStart2P',
+    fontSize: 12,
+    color: '#ff69b4',
+  },
+  input: {
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    width: '100%',
+    padding: 15,
+    borderRadius: 10,
+    marginBottom: 10,
+    borderWidth: 2,
+    borderColor: '#ffb6c1',
+    fontFamily: 'PressStart2P',
+    fontSize: 12,
+  },
+  loginButton: {
+    backgroundColor: '#ffb6c1',
+    padding: 15,
+    borderRadius: 10,
+    width: '100%',
+    alignItems: 'center',
+    marginTop: 10,
+    borderWidth: 3,
+    borderColor: '#ff69b4',
+    shadowColor: '#ff69b4',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+  },
+  buttonText: {
+    fontFamily: 'PressStart2P',
+    fontSize: 16,
+    color: '#fff',
+  },
+  errorText: {
+    color: '#ff6b6b',
+    marginBottom: 10,
+    fontFamily: 'PressStart2P',
+    fontSize: 10,
+    textAlign: 'center',
+  },
+  clearButton: {
+    marginTop: 20,
+    padding: 10,
+  },
+  clearButtonText: {
+    fontFamily: 'PressStart2P',
+    fontSize: 10,
+    color: '#ff6b6b',
+  },
+});
+
+export default LoginScreen; 

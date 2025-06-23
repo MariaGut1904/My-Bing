@@ -1,48 +1,78 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Image, ImageBackground, TouchableOpacity, ScrollView, Alert, Modal, TextInput } from 'react-native';
-import * as Animatable from 'react-native-animatable';
-import SchedulePlanner from './SchedulePlanner';
-import { useSchedule } from './ScheduleContext';
+import { View, Text, StyleSheet, Image, ImageBackground, TouchableOpacity, ScrollView, Alert, Modal, TextInput, Platform } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTasks } from './TaskContext';
+import { useSchedule } from './ScheduleContext';
 import { useBudget } from './BudgetContext';
 import { useAuth } from './AuthContext';
+import * as Animatable from 'react-native-animatable';
 
 const HomeScreen = ({ navigation }) => {
-  const { scheduleData, resetSchedule } = useSchedule();
-  const { tasks, addTask, deleteTask, resetTasks } = useTasks();
-  const { budgetData, resetBudget } = useBudget();
-  const { logout } = useAuth();
+  const { currentUser, logout } = useAuth();
+  const { tasks = [], addTask, deleteTask, resetTasks } = useTasks();
+  const { schedule = [], resetSchedule } = useSchedule();
+  const { budget = { food: [], money: [] }, resetBudget } = useBudget();
   const [isTaskModalVisible, setIsTaskModalVisible] = useState(false);
   const [newTaskText, setNewTaskText] = useState('');
 
   const handleLogout = async () => {
-    await logout();
-    navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
-    resetTasks();
-    resetSchedule();
-    resetBudget();
+    try {
+      await logout();
+      navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
+      resetTasks();
+      resetSchedule();
+      resetBudget();
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
   };
 
-  // Filter events for today and tomorrow
-  const getUpcomingEvents = () => {
-    const today = new Date().toISOString().split('T')[0];
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const tomorrowStr = tomorrow.toISOString().split('T')[0];
-
-    return scheduleData.filter(event => 
-      event.date === today || event.date === tomorrowStr
-    );
+  // Get today's date in a nice format
+  const getTodayDate = () => {
+    const today = new Date();
+    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+    return today.toLocaleDateString('en-US', options);
   };
 
-  const upcomingEvents = getUpcomingEvents();
+  // Filter events for today only
+  const getTodayEvents = () => {
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    const todayDay = today.getDay();
+
+    return schedule.filter(event => {
+      // For recurring classes
+      if (event.isRecurring && event.day === todayDay && event.creator === currentUser) {
+        return true;
+      }
+      // For one-time events
+      if (!event.isRecurring && event.date === todayStr && event.creator === currentUser) {
+        return true;
+      }
+      return false;
+    });
+  };
+
+  const todayEvents = getTodayEvents();
 
   // Count today's classes
   const getTodayClassesCount = () => {
-    const today = new Date().toISOString().split('T')[0];
-    return scheduleData.filter(event => 
-      event.date === today && event.type === 'class'
-    ).length;
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    const todayDay = today.getDay();
+
+    return schedule.filter(event => {
+      if (event.type !== 'class') return false;
+      // For recurring classes
+      if (event.isRecurring && event.day === todayDay && event.creator === currentUser) {
+        return true;
+      }
+      // For one-time classes
+      if (!event.isRecurring && event.date === todayStr && event.creator === currentUser) {
+        return true;
+      }
+      return false;
+    }).length;
   };
 
   const handleAddTask = () => {
@@ -54,159 +84,167 @@ const HomeScreen = ({ navigation }) => {
   };
 
   return (
-    <ImageBackground 
-      source={require('../assets/pixel-bg.png')} 
-      style={styles.bg} 
-      resizeMode="cover"
-    >
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
-        <Animatable.View animation="bounceIn" style={styles.header}>
-          <Image 
-            source={require('../assets/Maria.png')} 
-            style={styles.avatar}
-          />
-          <Text style={styles.title}>Welcome back, bestie! 💕</Text>
-        </Animatable.View>
+    <SafeAreaView style={styles.bg}>
+      <ImageBackground 
+        source={require('../assets/pastel-pixel-bg.jpg')} 
+        style={styles.bg} 
+        resizeMode="cover"
+      >
+        <ScrollView contentContainerStyle={styles.scrollContainer}>
+          <Animatable.View animation="bounceIn" style={styles.header}>
+            <Image 
+              source={require('../assets/Maria.png')} 
+              style={styles.avatar}
+            />
+            <Text style={styles.welcomeText}>Welcome back, {currentUser}</Text>
+            <Text style={styles.dateText}>{getTodayDate()}</Text>
+          </Animatable.View>
 
-        {/* Quick Stats Section */}
-        <Animatable.View animation="fadeInUp" style={styles.card}>
-          <Text style={styles.cardTitle}>✨ Today's Stats</Text>
-          <View style={styles.statsRow}>
-            <View style={styles.statItem}>
-              <Image source={require('../assets/kawaii-star.gif')} style={styles.statIcon} />
-              <Text style={styles.statValue}>{tasks.length}</Text>
-              <Text style={styles.statLabel}>Tasks</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Image source={require('../assets/pixel-heart.gif')} style={styles.statIcon} />
-              <Text style={styles.statValue}>{budgetData.percentage}%</Text>
-              <Text style={styles.statLabel}>Budget</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Image source={require('../assets/cat-face.gif')} style={styles.statIcon} />
-              <Text style={styles.statValue}>{getTodayClassesCount()}</Text>
-              <Text style={styles.statLabel}>Classes</Text>
-            </View>
-          </View>
-        </Animatable.View>
-
-        {/* Task Input Modal */}
-        <Modal
-          visible={isTaskModalVisible}
-          transparent={true}
-          animationType="slide"
-          onRequestClose={() => setIsTaskModalVisible(false)}
-        >
-          <View style={styles.modalContainer}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>Add New Task</Text>
-              <TextInput
-                style={styles.taskInput}
-                placeholder="Enter task..."
-                value={newTaskText}
-                onChangeText={setNewTaskText}
-              />
-              <View style={styles.modalButtons}>
-                <TouchableOpacity
-                  style={[styles.modalButton, { backgroundColor: '#f96565' }]}
-                  onPress={() => setIsTaskModalVisible(false)}
-                >
-                  <Text style={styles.modalButtonText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.modalButton, { backgroundColor: '#a259c6' }]}
-                  onPress={handleAddTask}
-                >
-                  <Text style={styles.modalButtonText}>Add</Text>
-                </TouchableOpacity>
+          {/* Quick Stats Section */}
+          <Animatable.View animation="fadeInUp" style={styles.card}>
+            <Text style={styles.cardTitle}>✨ Today's Stats</Text>
+            <View style={styles.statsRow}>
+              <View style={styles.statItem}>
+                <Image source={require('../assets/kawaii-star.gif')} style={styles.statIcon} />
+                <Text style={styles.statValue}>{tasks.length}</Text>
+                <Text style={styles.statLabel}>Tasks</Text>
+              </View>
+              <View style={styles.statItem}>
+                <Image source={require('../assets/pixel-heart.gif')} style={styles.statIcon} />
+                <Text style={styles.statValue}>{budget?.percentage || 0}%</Text>
+                <Text style={styles.statLabel}>Budget</Text>
+              </View>
+              <View style={styles.statItem}>
+                <Image source={require('../assets/cat-face.gif')} style={styles.statIcon} />
+                <Text style={styles.statValue}>{getTodayClassesCount()}</Text>
+                <Text style={styles.statLabel}>Classes</Text>
               </View>
             </View>
-          </View>
-        </Modal>
+          </Animatable.View>
 
-        {/* Upcoming Events */}
-        <Animatable.View animation="fadeInUp" delay={200} style={styles.card}>
-          <Text style={styles.cardTitle}>📅 Upcoming</Text>
-          {upcomingEvents.length > 0 ? (
-            upcomingEvents.map((event, index) => (
-              <View key={index} style={styles.eventItem}>
-                <Image 
-                  source={event.type === 'class' 
-                    ? require('../assets/rainbow.gif') 
-                    : require('../assets/kawaii-star.gif')} 
-                  style={styles.eventIcon} 
+          {/* Today's Events */}
+          <Animatable.View animation="fadeInUp" delay={200} style={styles.card}>
+            <Text style={styles.cardTitle}>📅 Today's Schedule</Text>
+            {todayEvents.length > 0 ? (
+              todayEvents.map((event, index) => (
+                <View key={index} style={styles.eventItem}>
+                  <Image 
+                    source={event.type === 'class' 
+                      ? require('../assets/rainbow.gif') 
+                      : require('../assets/kawaii-star.gif')} 
+                    style={styles.eventIcon} 
+                  />
+                  <View style={styles.eventInfo}>
+                    <Text style={styles.eventTitle}>
+                      {event.name}
+                      <Text style={styles.creatorText}> ~{event.creator}</Text>
+                    </Text>
+                    <Text style={styles.eventTime}>
+                      {event.startTime} - {event.endTime}
+                    </Text>
+                  </View>
+                </View>
+              ))
+            ) : (
+              <Text style={styles.noEventsText}>No events scheduled for today.</Text>
+            )}
+          </Animatable.View>
+
+          {/* Task Input Modal */}
+          <Modal
+            visible={isTaskModalVisible}
+            transparent={true}
+            animationType="slide"
+            onRequestClose={() => setIsTaskModalVisible(false)}
+          >
+            <View style={styles.modalContainer}>
+              <View style={styles.modalContent}>
+                <Text style={styles.modalTitle}>Add New Task</Text>
+                <TextInput
+                  style={styles.taskInput}
+                  placeholder="Enter task..."
+                  value={newTaskText}
+                  onChangeText={setNewTaskText}
                 />
-                <View>
-                  <Text style={styles.eventTitle}>{event.name}</Text>
-                  <Text style={styles.eventTime}>
-                    {event.startTime} - {event.endTime}
-                  </Text>
+                <View style={styles.modalButtons}>
+                  <TouchableOpacity
+                    style={[styles.modalButton, { backgroundColor: '#f96565' }]}
+                    onPress={() => setIsTaskModalVisible(false)}
+                  >
+                    <Text style={styles.modalButtonText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.modalButton, { backgroundColor: '#a259c6' }]}
+                    onPress={handleAddTask}
+                  >
+                    <Text style={styles.modalButtonText}>Add</Text>
+                  </TouchableOpacity>
                 </View>
               </View>
-            ))
-          ) : (
-            <Text style={styles.noEventsText}>No upcoming events today or tomorrow.</Text>
-          )}
-        </Animatable.View>
+            </View>
+          </Modal>
 
-        {/* Task List Section */}
-        <Animatable.View animation="fadeInUp" delay={400} style={styles.card}>
-          <Text style={styles.cardTitle}>📝 Tasks ({tasks.length})</Text>
-          {tasks.length > 0 ? (
-            tasks.map((task) => (
-              <View key={task.id} style={styles.taskItem}>
-                <Text style={styles.taskText}>{task.text}</Text>
-                <TouchableOpacity
-                  onPress={() => deleteTask(task.id)}
-                  style={styles.deleteButton}
-                >
-                  <Image
-                    source={require('../assets/trash.png')}
-                    style={styles.deleteIcon}
-                  />
-                </TouchableOpacity>
-              </View>
-            ))
-          ) : (
-            <Text style={styles.noTasksText}>No tasks yet. Add one above!</Text>
-          )}
-        </Animatable.View>
+          {/* Task List Section */}
+          <Animatable.View animation="fadeInUp" delay={400} style={styles.card}>
+            <Text style={styles.cardTitle}>📝 Tasks ({tasks.length})</Text>
+            {tasks.length > 0 ? (
+              tasks.map((task) => (
+                <View key={task.id} style={styles.taskItem}>
+                  <View style={styles.taskContent}>
+                    <Text style={styles.taskText}>{task.text}</Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => deleteTask(task.id)}
+                    style={styles.deleteButton}
+                  >
+                    <Image
+                      source={require('../assets/trash.png')}
+                      style={styles.deleteIcon}
+                    />
+                  </TouchableOpacity>
+                </View>
+              ))
+            ) : (
+              <Text style={styles.noTasksText}>No tasks yet. Add one above!</Text>
+            )}
+          </Animatable.View>
 
-        {/* Quick Actions */}
-        <View style={styles.buttonRow}>
-          <Animatable.View animation="fadeInLeft" delay={400}>
-            <TouchableOpacity 
-              style={[styles.button, { backgroundColor: '#d1b3ff' }]}
-              onPress={() => setIsTaskModalVisible(true)}
-            >
-              <Text style={styles.buttonText}>Add Task ✏️</Text>
-            </TouchableOpacity>
+          {/* Quick Actions */}
+          <View style={styles.buttonRow}>
+            <Animatable.View animation="fadeInLeft" delay={400}>
+              <TouchableOpacity 
+                style={[styles.button, { backgroundColor: '#d1b3ff' }]}
+                onPress={() => setIsTaskModalVisible(true)}
+              >
+                <Text style={styles.buttonText}>Add Task ✏️</Text>
+              </TouchableOpacity>
+            </Animatable.View>
+            <Animatable.View animation="fadeInRight" delay={400}>
+              <TouchableOpacity 
+                style={[styles.button, { backgroundColor: '#f6b4e6' }]}
+                onPress={() => navigation.navigate('Schedule')}
+              >
+                <Text style={styles.buttonText}>View Schedule 🗓️</Text>
+              </TouchableOpacity>
+            </Animatable.View>
+          </View>
+
+          {/* Motivational Quote */}
+          <Animatable.View animation="fadeInUp" delay={600} style={styles.quoteCard}>
+            <Text style={styles.quoteText}>"You're doing amazing, sweetie! 💖"</Text>
+            <Image source={require('../assets/pixel-heart.gif')} style={styles.quoteIcon} />
           </Animatable.View>
-          <Animatable.View animation="fadeInRight" delay={400}>
-            <TouchableOpacity 
-              style={[styles.button, { backgroundColor: '#f6b4e6' }]}
-              onPress={() => navigation.navigate('Schedule')}
-            >
-              <Text style={styles.buttonText}>View Schedule 🗓️</Text>
-            </TouchableOpacity>
-          </Animatable.View>
+        </ScrollView>
+        <View style={styles.floatingContainer}>
+          <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
+            <Image 
+              source={require('../assets/logout.png')} 
+              style={styles.logoutIcon}
+            />
+          </TouchableOpacity>
         </View>
-
-        {/* Motivational Quote */}
-        <Animatable.View animation="fadeInUp" delay={600} style={styles.quoteCard}>
-          <Text style={styles.quoteText}>"You're doing amazing, sweetie! 💖"</Text>
-          <Image source={require('../assets/pixel-heart.gif')} style={styles.quoteIcon} />
-        </Animatable.View>
-      </ScrollView>
-      <View style={styles.floatingContainer}>
-        <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
-          <Image 
-            source={require('../assets/logout.png')} 
-            style={styles.logoutIcon}
-          />
-        </TouchableOpacity>
-      </View>
-    </ImageBackground>
+      </ImageBackground>
+    </SafeAreaView>
   );
 };
 
@@ -227,31 +265,25 @@ const styles = StyleSheet.create({
     height: 100,
     marginBottom: 15,
   },
-  title: {
+  welcomeText: {
     fontFamily: 'PressStart2P',
     fontSize: 14,
     color: '#a259c6',
     textAlign: 'center',
   },
   card: {
-    backgroundColor: 'rgba(255, 240, 250, 0.8)',
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
     borderRadius: 15,
-    padding: 15,
+    padding: 20,
     marginBottom: 20,
     borderWidth: 2,
-    borderColor: '#d1b3ff',
-    shadowColor: '#a259c6',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 5,
+    borderColor: '#ffb6c1',
   },
   cardTitle: {
     fontFamily: 'PressStart2P',
-    fontSize: 10,
-    color: '#a259c6',
-    marginBottom: 12,
-    textAlign: 'center',
+    fontSize: 16,
+    color: '#ff69b4',
+    marginBottom: 15,
   },
   statsRow: {
     flexDirection: 'row',
@@ -278,24 +310,37 @@ const styles = StyleSheet.create({
   eventItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0d0ff',
+    backgroundColor: '#fff',
+    padding: 15,
+    borderRadius: 10,
+    marginBottom: 10,
+    borderWidth: 2,
+    borderColor: '#ffb6c1',
   },
-  eventIcon: {
-    width: 25,
-    height: 25,
-    marginRight: 10,
+  eventInfo: {
+    flex: 1,
+    marginLeft: 10,
   },
   eventTitle: {
     fontFamily: 'PressStart2P',
+    fontSize: 12,
+    color: '#ff69b4',
+    marginBottom: 5,
+  },
+  creatorText: {
+    fontFamily: 'PressStart2P',
     fontSize: 10,
-    color: '#6e3abf',
+    color: '#ffb6c1',
+    fontStyle: 'italic',
   },
   eventTime: {
     fontFamily: 'PressStart2P',
-    fontSize: 8,
-    color: '#d291bc',
+    fontSize: 10,
+    color: '#ffb6c1',
+  },
+  eventIcon: {
+    width: 30,
+    height: 30,
   },
   buttonRow: {
     flexDirection: 'row',
@@ -365,8 +410,8 @@ const styles = StyleSheet.create({
   },
   noEventsText: {
     fontFamily: 'PressStart2P',
-    fontSize: 8,
-    color: '#d291bc',
+    fontSize: 10,
+    color: '#ff69b4',
     textAlign: 'center',
     marginTop: 10,
   },
@@ -417,37 +462,48 @@ const styles = StyleSheet.create({
   },
   taskItem: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 10,
-    marginVertical: 5,
-    backgroundColor: 'white',
+    justifyContent: 'space-between',
+    backgroundColor: '#fff',
+    padding: 15,
     borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#d1b3ff',
+    marginBottom: 10,
+    borderWidth: 2,
+    borderColor: '#ffb6c1',
+  },
+  taskContent: {
+    flex: 1,
+    marginRight: 10,
   },
   taskText: {
     fontFamily: 'PressStart2P',
-    fontSize: 10,
-    color: '#6e3abf',
-    flex: 1,
+    fontSize: 12,
+    color: '#ff69b4',
   },
   deleteButton: {
-    marginLeft: 10,
     padding: 5,
   },
   deleteIcon: {
     width: 20,
     height: 20,
-    tintColor: '#f96565',
+    tintColor: '#ff6b6b',
   },
   noTasksText: {
     fontFamily: 'PressStart2P',
-    fontSize: 8,
-    color: '#d291bc',
+    fontSize: 10,
+    color: '#ff69b4',
     textAlign: 'center',
     marginTop: 10,
+  },
+  dateText: {
+    fontFamily: 'PressStart2P',
+    fontSize: 12,
+    color: '#ff69b4',
+    marginTop: 5,
+    textAlign: 'center',
   },
 });
 
 export default HomeScreen;
+
+

@@ -1,11 +1,24 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { View, ActivityIndicator, StyleSheet, Platform, LogBox, StatusBar } from 'react-native';
 import { enableScreens } from 'react-native-screens';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
+import * as Font from 'expo-font';
+import { AuthProvider, useAuth } from './Components/AuthContext';
+import { TaskProvider } from './Components/TaskContext';
+import { ScheduleProvider } from './Components/ScheduleContext';
+import { BudgetProvider } from './Components/BudgetContext';
+import { TutorialProvider } from './Components/TutorialContext';
+import { TutorialOverlay } from './Components/TutorialOverlay';
+import LoginScreen from './Components/LoginScreen';
+import HomeScreen from './Components/HomeScreen';
+import BudgetTracker from './Components/BudgetTracker';
+import SchedulePlanner from './Components/SchedulePlanner';
+import AvatarBuilder from './Components/AvatarBuilder';
+import LoadingScreen from './Components/LoadingScreen';
 
 // Enable screens for better performance
 enableScreens(true);
@@ -22,29 +35,12 @@ LogBox.ignoreLogs([
   'VirtualizedLists should never be nested',
 ]);
 
-// Initialize navigation
-const Stack = createNativeStackNavigator();
+const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
-// Import components directly
-import HomeScreen from './Components/HomeScreen';
-import LoginScreen from './Components/LoginScreen';
-import BudgetTracker from './Components/BudgetTracker';
-import SchedulePlanner from './Components/SchedulePlanner';
-import AvatarBuilder from './Components/AvatarBuilder';
-import { AuthProvider } from './Components/AuthContext';
-import { ScheduleProvider } from './Components/ScheduleContext';
-import { TaskProvider } from './Components/TaskContext';
-import { BudgetProvider } from './Components/BudgetContext';
+function TabNavigator() {
+  const { currentUser } = useAuth();
 
-// Loading component
-const LoadingScreen = () => (
-  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f8e1f4' }}>
-    <ActivityIndicator size={36} color="#d291bc" />
-  </View>
-);
-
-const TabNavigator = () => {
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -63,62 +59,108 @@ const TabNavigator = () => {
 
           return <Ionicons name={iconName} size={size} color={color} />;
         },
+        tabBarActiveTintColor: '#ff69b4',
+        tabBarInactiveTintColor: '#ffb6c1',
         tabBarStyle: {
-          backgroundColor: '#f8e1f4',
-          height: 70,
-          paddingTop: 10,
-          paddingBottom: Platform.OS === 'ios' ? 20 : 10,
-          borderTopWidth: 1,
-          borderTopColor: '#d1b3ff',
+          backgroundColor: '#fff0fa',
+          borderTopWidth: 2,
+          borderTopColor: '#ffb6c1',
+          paddingBottom: 5,
+          paddingTop: 5,
         },
-        tabBarLabelStyle: {
-          fontSize: 12,
-          color: '#a259c6',
-        },
-        tabBarActiveTintColor: '#a259c6',
-        tabBarInactiveTintColor: '#d291bc',
         headerShown: false,
       })}
     >
-      <Tab.Screen name="Home" component={HomeScreen} />
-      <Tab.Screen name="Budget" component={BudgetTracker} />
-      <Tab.Screen name="Schedule" component={SchedulePlanner} />
-      <Tab.Screen name="Avatar" component={AvatarBuilder} />
+      <Tab.Screen 
+        name="Home" 
+        component={HomeScreen}
+        options={{
+          title: 'Home',
+        }}
+      />
+      <Tab.Screen 
+        name="Budget" 
+        component={BudgetTracker}
+        options={{
+          title: 'Budget',
+        }}
+      />
+      <Tab.Screen 
+        name="Schedule" 
+        component={SchedulePlanner}
+        options={{
+          title: 'Schedule',
+        }}
+      />
+      <Tab.Screen 
+        name="Avatar" 
+        component={AvatarBuilder}
+        options={{
+          title: 'Avatar',
+        }}
+      />
     </Tab.Navigator>
   );
-};
+}
 
-const App = () => {
+function NavigationWrapper() {
+  const { currentUser, loading } = useAuth();
+
+  if (loading) {
+    return null;
+  }
+
+  return (
+    <NavigationContainer>
+      <Stack.Navigator
+        screenOptions={{
+          headerShown: false,
+          cardStyle: { backgroundColor: '#fff' }
+        }}
+      >
+        {!currentUser ? (
+          <Stack.Screen 
+            name="Login" 
+            component={LoginScreen}
+            options={{ headerShown: false }}
+          />
+        ) : (
+          <Stack.Screen 
+            name="MainTabs" 
+            component={TabNavigator}
+            options={{ headerShown: false }}
+          />
+        )}
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
+}
+
+export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
+      <StatusBar style="auto" />
       <AuthProvider>
         <TaskProvider>
           <ScheduleProvider>
             <BudgetProvider>
-              <NavigationContainer>
-                <View style={styles.bg}>
-                  <StatusBar barStyle="dark-content" backgroundColor="#f8e1f4" />
-                  <Stack.Navigator
-                    initialRouteName="Login"
-                    screenOptions={{
-                      headerShown: false,
-                      animation: 'none',
-                    }}
-                  >
-                    <Stack.Screen name="Login" component={LoginScreen} />
-                    <Stack.Screen name="Home" component={TabNavigator} />
-                  </Stack.Navigator>
-                </View>
-              </NavigationContainer>
+              <TutorialProvider>
+                <NavigationWrapper />
+              </TutorialProvider>
             </BudgetProvider>
           </ScheduleProvider>
         </TaskProvider>
       </AuthProvider>
     </GestureHandlerRootView>
   );
-};
+}
 
 const styles = StyleSheet.create({
+  iconContainer: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+  },
   bg: {
     flex: 1,
     backgroundColor: '#f8e1f4',
@@ -129,6 +171,4 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8e1f4',
   },
 });
-
-export default App;
 

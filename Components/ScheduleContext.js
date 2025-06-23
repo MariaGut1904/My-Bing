@@ -1,55 +1,125 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useState, useEffect, useContext } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuth } from './AuthContext';
 
 const ScheduleContext = createContext();
 
 export const ScheduleProvider = ({ children }) => {
-  const [scheduleData, setScheduleData] = useState([]);
-  const [currentUserId, setCurrentUserId] = useState(null);
+  const { currentUser } = useAuth();
+  const [schedule, setSchedule] = useState([]);
 
   // Load schedule for the current user
   useEffect(() => {
     const loadSchedule = async () => {
-      if (!currentUserId) {
-        setScheduleData([]);
-        return;
-      }
+      if (!currentUser) return;
       try {
-        const data = await AsyncStorage.getItem(`schedule_${currentUserId}`);
-        if (data) {
-          const parsed = JSON.parse(data);
-          // Validate data belongs to current user
-          if (parsed.some(event => event.creator !== currentUserId)) {
-            setScheduleData([]);
-            await AsyncStorage.removeItem(`schedule_${currentUserId}`);
-          } else {
-            setScheduleData(parsed);
+        // Load all classes from AsyncStorage
+        const allClassesStr = await AsyncStorage.getItem('allClasses');
+        const allClasses = allClassesStr ? JSON.parse(allClassesStr) : [];
+        
+        // Remove duplicates based on unique key
+        const uniqueClasses = new Map();
+        allClasses.forEach(cls => {
+          const key = `${cls.name}-${cls.startTime}-${cls.endTime}-${cls.day}-${cls.semester}-${cls.creator}`;
+          if (!uniqueClasses.has(key)) {
+            uniqueClasses.set(key, cls);
           }
-        }
+        });
+        
+        // Filter classes that belong to current user or are shared
+        const userSchedule = Array.from(uniqueClasses.values()).filter(cls => {
+          const isUserClass = cls.creator === currentUser;
+          const isShared = cls.isShared;
+          console.log('Loading class:', cls.name, 'creator:', cls.creator, 'isShared:', isShared, 'currentUser:', currentUser);
+          return isUserClass || isShared;
+        });
+        
+        console.log('Loading schedule for user:', currentUser);
+        console.log('All classes:', Array.from(uniqueClasses.values()));
+        console.log('Filtered schedule:', userSchedule);
+        
+        setSchedule(userSchedule);
       } catch (error) {
-        console.error('Failed to load schedule', error);
-        setScheduleData([]);
+        console.error('Error loading schedule:', error);
       }
     };
     loadSchedule();
-  }, [currentUserId]);
+  }, [currentUser]);
 
-  // Save schedule for the current user
+  // Save schedule whenever it changes
   useEffect(() => {
-    if (!currentUserId) return;
-    AsyncStorage.setItem(`schedule_${currentUserId}`, JSON.stringify(scheduleData));
-  }, [scheduleData, currentUserId]);
+    const saveSchedule = async () => {
+      if (!currentUser) return;
+      try {
+        // Get all existing classes
+        const allClassesStr = await AsyncStorage.getItem('allClasses');
+        const allClasses = allClassesStr ? JSON.parse(allClassesStr) : [];
+        
+        // Remove duplicates based on unique key
+        const uniqueClasses = new Map();
+        allClasses.forEach(cls => {
+          const key = `${cls.name}-${cls.startTime}-${cls.endTime}-${cls.day}-${cls.semester}-${cls.creator}`;
+          if (!uniqueClasses.has(key)) {
+            uniqueClasses.set(key, cls);
+          }
+        });
+        
+        // Keep classes that don't belong to current user
+        const otherUsersClasses = Array.from(uniqueClasses.values()).filter(cls => 
+          cls.creator !== currentUser
+        );
+        
+        // Get current user's classes and shared classes
+        const userClasses = schedule.filter(cls => 
+          cls.creator === currentUser || cls.isShared
+        );
+        
+        // Combine all classes
+        const finalClasses = [...otherUsersClasses, ...userClasses];
+        
+        // Save to AsyncStorage
+        await AsyncStorage.setItem('allClasses', JSON.stringify(finalClasses));
+        console.log('Saved all classes:', finalClasses);
+      } catch (error) {
+        console.error('Error saving schedule:', error);
+      }
+    };
+    saveSchedule();
+  }, [schedule, currentUser]);
+
+  const addEvent = (event) => {
+    setSchedule(prevSchedule => [...prevSchedule, { ...event, id: Date.now().toString() }]);
+  };
+
+  const deleteEvent = (eventId) => {
+    setSchedule(prevSchedule => prevSchedule.filter(event => event.id !== eventId));
+  };
+
+  const setScheduleData = (newSchedule) => {
+    setSchedule(newSchedule);
+  };
+
+  const resetSchedule = () => {
+    setSchedule([]);
+  };
 
   return (
     <ScheduleContext.Provider value={{ 
-      scheduleData, 
-      setScheduleData, 
-      setCurrentUserId,
-      resetSchedule: () => setScheduleData([])
+      schedule, 
+      addEvent, 
+      deleteEvent, 
+      resetSchedule,
+      setScheduleData 
     }}>
       {children}
     </ScheduleContext.Provider>
   );
 };
 
-export const useSchedule = () => useContext(ScheduleContext);
+export const useSchedule = () => {
+  const context = useContext(ScheduleContext);
+  if (!context) {
+    throw new Error('useSchedule must be used within a ScheduleProvider');
+  }
+  return context;
+};
