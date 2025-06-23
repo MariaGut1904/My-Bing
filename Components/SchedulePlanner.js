@@ -519,35 +519,51 @@ const SchedulePlanner = () => {
     setCurrentUser(authUser);
   }, [authUser]);
 
-  // Helper function to generate time slots for the day view
+  // Helper function to generate 15-minute time slots for the day view
   const generateTimeSlots = () => {
-    // 8 AM to 11 PM
     const slots = [];
-    for (let i = 8; i < 12; i++) {
-      slots.push(`${i} AM`);
-    }
-    slots.push('12 PM');
-    for (let i = 1; i <= 11; i++) {
-      slots.push(`${i} PM`);
+    const startHour = 8;
+    const endHour = 23; // 11 PM
+    for (let hour = startHour; hour <= endHour; hour++) {
+      for (let min = 0; min < 60; min += 15) {
+        let displayHour = hour;
+        let period = 'AM';
+        if (hour === 0) {
+          displayHour = 12;
+        } else if (hour === 12) {
+          period = 'PM';
+        } else if (hour > 12) {
+          displayHour = hour - 12;
+          period = 'PM';
+        }
+        const minStr = min.toString().padStart(2, '0');
+        slots.push(`${displayHour}:${minStr} ${period}`);
+      }
     }
     return slots;
   };
 
-  // Helper to get event for a user at a specific time
+  // Helper to get event for a user at a specific 15-min interval
   const getEventForUserAtTime = (user, timeLabel) => {
     if (!selectedDate) return 'Free';
-    // Convert '8 AM', '12 PM', etc. to 24-hour
-    const [hourStr, period] = timeLabel.split(' ');
-    let hour = parseInt(hourStr, 10);
+    // Parse '8:15 AM', '12:00 PM', etc. to 24-hour time
+    const [time, period] = timeLabel.split(' ');
+    let [hour, minute] = time.split(':').map(Number);
     if (period === 'PM' && hour !== 12) hour += 12;
     if (period === 'AM' && hour === 12) hour = 0;
+    const slotStart = hour * 60 + minute;
+    const slotEnd = slotStart + 15;
     const selectedDateObj = new Date(selectedDate + 'T00:00:00');
     const selectedDay = selectedDateObj.getDay();
     const event = allClassesFull.find(item => {
       if (item.creator !== user) return false;
-      const startHour = parseInt(item.startTime.split(':')[0], 10);
-      const endHour = parseInt(item.endTime.split(':')[0], 10);
-      if (hour >= startHour && hour < endHour) {
+      // Parse event start/end
+      const [eventStartHour, eventStartMinute] = item.startTime.split(':').map(Number);
+      const [eventEndHour, eventEndMinute] = item.endTime.split(':').map(Number);
+      const eventStart = eventStartHour * 60 + eventStartMinute;
+      const eventEnd = eventEndHour * 60 + eventEndMinute;
+      // Mark busy if slot overlaps event, or if slotEnd === eventEnd (so the slot ending exactly at the event end is busy)
+      if ((slotStart < eventEnd && slotEnd > eventStart) || slotEnd === eventEnd) {
         if (item.isRecurring) {
           return item.day === selectedDay;
         }
