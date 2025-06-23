@@ -5,11 +5,13 @@ import * as Animatable from 'react-native-animatable';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Calendar } from 'react-native-calendars';
 import { useSchedule } from './ScheduleContext';
+import { useAuth } from './AuthContext';
 
 const { width } = Dimensions.get('window');
 
 const SchedulePlanner = () => {
   const { scheduleData, setScheduleData } = useSchedule();
+  const { currentUser: authUser } = useAuth();
   const [openMonth, setOpenMonth] = useState(false);
   const [semester, setSemester] = useState('Fall 2025');
   const [openDay, setOpenDay] = useState(false);
@@ -24,10 +26,18 @@ const SchedulePlanner = () => {
   const [isEvent, setIsEvent] = useState(false);
   const [isShared, setIsShared] = useState(false);
   const [eventDescription, setEventDescription] = useState('');
-  const [currentUser, setCurrentUser] = useState('You');
+  const [currentUser, setCurrentUser] = useState(authUser || 'Maria');
   const [showEventsInCalendar, setShowEventsInCalendar] = useState(true);
   const [semesterOpen, setSemesterOpen] = useState(false);
   const [dayOpen, setDayOpen] = useState(false);
+  const [userPickerOpen, setUserPickerOpen] = useState(false);
+  const [userPickerValue, setUserPickerValue] = useState(authUser || 'Maria');
+  const [userPickerItems, setUserPickerItems] = useState([
+    { label: 'Maria', value: 'Maria' },
+    { label: 'Luna', value: 'Luna' },
+    { label: 'Reni', value: 'Reni' },
+    { label: 'Sheila', value: 'Sheila' },
+  ]);
 
   // Load classes when component mounts
   useEffect(() => {
@@ -170,9 +180,8 @@ const SchedulePlanner = () => {
     }
   };
 
-  const handleAddClass = () => {
+  const handleAddClass = async () => {
     Keyboard.dismiss();
-    
     if (isEvent) {
       if (!eventDescription || !startTime || !endTime || !selectedDate) {
         Alert.alert("Error", "Please fill all event fields and select a date from calendar");
@@ -184,10 +193,9 @@ const SchedulePlanner = () => {
         return;
       }
     }
-
-    // For recurring classes, we don't need to validate the selected date
+    let newItem;
     if (!isEvent) {
-      const newItem = {
+      newItem = {
         id: Date.now().toString(),
         type: 'class',
         name: className,
@@ -198,79 +206,73 @@ const SchedulePlanner = () => {
         creator: currentUser,
         semester: semester
       };
-
-      const updatedClasses = [...allClasses, newItem];
-      setAllClasses(updatedClasses);
-      setScheduleData(updatedClasses);
-      
-      // Update marked dates
-      const newMarkedDates = { ...markedDates };
+    } else {
       const semesterDates = getSemesterDates(semester);
-      let currentDate = new Date(semesterDates.start);
-      while (currentDate <= semesterDates.end) {
-        if (currentDate.getDay() === day) {
-          const dateStr = currentDate.toISOString().split('T')[0];
-          newMarkedDates[dateStr] = { 
-            marked: true, 
-            dotColor: '#a259c6',
-            selected: true
-          };
+      const selectedDateObj = new Date(selectedDate);
+      if (selectedDateObj < semesterDates.start || selectedDateObj > semesterDates.end) {
+        Alert.alert(
+          "Invalid Date",
+          `Please select a date between ${semesterDates.start.toLocaleDateString()} and ${semesterDates.end.toLocaleDateString()} for ${semester}`,
+          [{ text: "OK" }]
+        );
+        return;
+      }
+      newItem = {
+        id: Date.now().toString(),
+        type: 'event',
+        name: eventDescription,
+        startTime,
+        endTime,
+        date: selectedDate,
+        isRecurring: false,
+        creator: currentUser,
+        semester: semester
+      };
+    }
+    try {
+      // Load full list
+      const savedClasses = await AsyncStorage.getItem('allClasses');
+      let allClassesFull = savedClasses ? JSON.parse(savedClasses) : [];
+      allClassesFull.push(newItem);
+      await AsyncStorage.setItem('allClasses', JSON.stringify(allClassesFull));
+      // Now filter for current user for display
+      const relevantClasses = allClassesFull.filter(cls => cls.creator === currentUser || cls.isShared);
+      setAllClasses(relevantClasses);
+      setScheduleData(relevantClasses);
+      // Update marked dates as before
+      const newMarkedDates = { ...markedDates };
+      if (!isEvent) {
+        const semesterDates = getSemesterDates(semester);
+        let currentDate = new Date(semesterDates.start);
+        while (currentDate <= semesterDates.end) {
+          if (currentDate.getDay() === day) {
+            const dateStr = currentDate.toISOString().split('T')[0];
+            newMarkedDates[dateStr] = { 
+              marked: true, 
+              dotColor: '#a259c6',
+              selected: true
+            };
+          }
+          currentDate.setDate(currentDate.getDate() + 1);
         }
-        currentDate.setDate(currentDate.getDate() + 1);
+      } else {
+        newMarkedDates[selectedDate] = { 
+          marked: true, 
+          dotColor: '#a259c6',
+          selected: true
+        };
       }
       setMarkedDates(newMarkedDates);
-      
       // Reset form
       setClassName('');
       setStartTime('');
       setEndTime('');
       setDay(null);
-      return;
+      setEventDescription('');
+      setSelectedDate(null);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to save class: ' + error.message);
     }
-
-    // For one-time events, validate the selected date
-    const semesterDates = getSemesterDates(semester);
-    const selectedDateObj = new Date(selectedDate);
-    
-    if (selectedDateObj < semesterDates.start || selectedDateObj > semesterDates.end) {
-      Alert.alert(
-        "Invalid Date",
-        `Please select a date between ${semesterDates.start.toLocaleDateString()} and ${semesterDates.end.toLocaleDateString()} for ${semester}`,
-        [{ text: "OK" }]
-      );
-      return;
-    }
-
-    const newItem = {
-      id: Date.now().toString(),
-      type: 'event',
-      name: eventDescription,
-      startTime,
-      endTime,
-      date: selectedDate,
-      isRecurring: false,
-      creator: currentUser,
-      semester: semester
-    };
-
-    const updatedClasses = [...allClasses, newItem];
-    setAllClasses(updatedClasses);
-    setScheduleData(updatedClasses);
-    
-    // Update marked dates
-    const newMarkedDates = { ...markedDates };
-    newMarkedDates[selectedDate] = { 
-      marked: true, 
-      dotColor: '#a259c6',
-      selected: true
-    };
-    setMarkedDates(newMarkedDates);
-    
-    // Reset form
-    setEventDescription('');
-    setStartTime('');
-    setEndTime('');
-    setSelectedDate(null);
   };
 
   const handleDayPress = (day) => {
@@ -304,56 +306,46 @@ const SchedulePlanner = () => {
 
   const handleShare = async (item) => {
     // Check if this item is already shared
-    const isAlreadyShared = allClasses.some(cls => 
-      cls.isShared && 
-      cls.name === item.name && 
-      cls.startTime === item.startTime && 
-      cls.endTime === item.endTime &&
-      cls.day === item.day &&
-      cls.semester === item.semester
-    );
-
-    if (isAlreadyShared) {
-      Alert.alert(
-        "Already Shared",
-        "This class is already shared with everyone!",
-        [{ text: "OK" }]
-      );
-      return;
-    }
-
-    // Create a copy of the item with the current user as creator
-    const sharedItem = {
-      ...item,
-      id: Date.now().toString(),
-      creator: currentUser,
-      isShared: true,
-      sharedBy: currentUser,
-      date: item.date,
-      day: item.day,
-      semester: item.semester
-    };
-
     try {
-      // Get existing classes from AsyncStorage
-      const existingClassesStr = await AsyncStorage.getItem('allClasses');
-      const existingClasses = existingClassesStr ? JSON.parse(existingClassesStr) : [];
-      
-      // Add the new shared class
-      const updatedClasses = [...existingClasses, sharedItem];
-      
-      // Save to AsyncStorage
-      await AsyncStorage.setItem('allClasses', JSON.stringify(updatedClasses));
-      console.log('Saved shared class to AsyncStorage:', sharedItem);
-      
-      // Update state
-      setAllClasses(updatedClasses);
-      setScheduleData(updatedClasses);
-
+      const savedClasses = await AsyncStorage.getItem('allClasses');
+      let allClassesFull = savedClasses ? JSON.parse(savedClasses) : [];
+      const isAlreadyShared = allClassesFull.some(cls => 
+        cls.isShared && 
+        cls.name === item.name && 
+        cls.startTime === item.startTime && 
+        cls.endTime === item.endTime &&
+        ((cls.day !== undefined && cls.day === item.day) || (cls.date && cls.date === item.date)) &&
+        cls.semester === item.semester
+      );
+      if (isAlreadyShared) {
+        Alert.alert(
+          "Already Shared",
+          "This class or event is already shared with everyone!",
+          [{ text: "OK" }]
+        );
+        return;
+      }
+      // Create a copy of the item with the current user as creator
+      const sharedItem = {
+        ...item,
+        id: Date.now().toString(),
+        creator: currentUser,
+        isShared: true,
+        sharedBy: currentUser,
+        date: item.date,
+        day: item.day,
+        semester: item.semester
+      };
+      // Add the new shared class/event
+      allClassesFull.push(sharedItem);
+      await AsyncStorage.setItem('allClasses', JSON.stringify(allClassesFull));
+      // Update state for current user
+      const relevantClasses = allClassesFull.filter(cls => cls.creator === currentUser || cls.isShared);
+      setAllClasses(relevantClasses);
+      setScheduleData(relevantClasses);
       // Update marked dates for the shared item
       const newMarkedDates = { ...markedDates };
       if (item.isRecurring) {
-        // For recurring classes, mark all dates in the semester
         const semesterDates = getSemesterDates(item.semester);
         let currentDate = new Date(semesterDates.start);
         while (currentDate <= semesterDates.end) {
@@ -368,7 +360,6 @@ const SchedulePlanner = () => {
           currentDate.setDate(currentDate.getDate() + 1);
         }
       } else {
-        // For one-time events, mark the specific date
         newMarkedDates[item.date] = { 
           marked: true, 
           dotColor: item.semester === semester ? '#a259c6' : '#d1b3ff',
@@ -376,18 +367,16 @@ const SchedulePlanner = () => {
         };
       }
       setMarkedDates(newMarkedDates);
-
-      // Show success message
       Alert.alert(
         "Shared!",
         `${item.type === 'class' ? 'Class' : 'Event'} has been shared with everyone!`,
         [{ text: "OK" }]
       );
     } catch (error) {
-      console.error('Error sharing class:', error);
+      console.error('Error sharing class/event:', error);
       Alert.alert(
         "Error",
-        "Failed to share the class. Please try again.",
+        "Failed to share the class or event. Please try again.",
         [{ text: "OK" }]
       );
     }
@@ -537,6 +526,10 @@ const SchedulePlanner = () => {
     };
   }, [currentUser, semester]);
 
+  useEffect(() => {
+    setCurrentUser(userPickerValue);
+  }, [userPickerValue]);
+
   return (
     <ImageBackground source={require('../assets/pixel-bg.png')} style={styles.bg}>
       <SafeAreaView style={{ flex: 1 }}>
@@ -550,7 +543,22 @@ const SchedulePlanner = () => {
             <Text style={styles.deleteButtonText}>Delete All</Text>
           </TouchableOpacity>
         </Animatable.View>
-
+        {/* User Picker */}
+        <View style={{ zIndex: 4000, marginHorizontal: 20, marginTop: 10 }}>
+          <DropDownPicker
+            open={userPickerOpen}
+            value={userPickerValue}
+            items={userPickerItems}
+            setOpen={setUserPickerOpen}
+            setValue={setUserPickerValue}
+            setItems={setUserPickerItems}
+            placeholder="Select user to view schedule"
+            style={{ backgroundColor: '#fff0fa', borderColor: '#a259c6', borderWidth: 2, borderRadius: 10, marginBottom: 10 }}
+            dropDownContainerStyle={{ backgroundColor: '#fff0fa', borderColor: '#a259c6', borderRadius: 10 }}
+            textStyle={{ color: '#a259c6', fontFamily: 'PressStart2P', fontSize: 12 }}
+            zIndex={4000}
+          />
+        </View>
         <ScrollView contentContainerStyle={styles.scrollContainer}>
           <View style={styles.toggleContainer}>
             <TouchableOpacity 
@@ -612,108 +620,110 @@ const SchedulePlanner = () => {
               {/* Add Form - Only show in Class and Event tabs */}
               {!isShared && (
                 <Animatable.View animation="fadeInUp" delay={100} style={styles.eventCard}>
-                  <Text style={styles.eventCardTitle}>
-                    {isEvent ? 'Add New Event' : 'Add New Class'}
-                  </Text>
-                  
-                  {!isEvent && (
-                    <View style={styles.inputContainer}>
-                      <Text style={styles.inputLabel}>Class Name</Text>
-                      <TextInput
-                        style={styles.input}
-                        value={className}
-                        onChangeText={setClassName}
-                        placeholder="Enter class name"
-                        placeholderTextColor="#d1b3ff"
-                      />
-                    </View>
-                  )}
-
-                  {isEvent && (
-                    <View style={styles.inputContainer}>
-                      <Text style={styles.inputLabel}>Event Description</Text>
-                      <TextInput
-                        style={styles.input}
-                        value={eventDescription}
-                        onChangeText={setEventDescription}
-                        placeholder="Enter event description"
-                        placeholderTextColor="#d1b3ff"
-                      />
-                    </View>
-                  )}
-
-                  <View style={styles.timeContainer}>
-                    <View style={styles.timeInput}>
-                      <Text style={styles.inputLabel}>Start Time</Text>
-                      <TextInput
-                        style={styles.input}
-                        value={startTime}
-                        onChangeText={setStartTime}
-                        placeholder="HH:MM"
-                        placeholderTextColor="#d1b3ff"
-                      />
-                    </View>
-                    <View style={styles.timeInput}>
-                      <Text style={styles.inputLabel}>End Time</Text>
-                      <TextInput
-                        style={styles.input}
-                        value={endTime}
-                        onChangeText={setEndTime}
-                        placeholder="HH:MM"
-                        placeholderTextColor="#d1b3ff"
-                      />
-                    </View>
-                  </View>
-
-                  {!isEvent && (
+                  {userPickerValue !== authUser ? (
+                    <Text style={{ color: '#a259c6', fontFamily: 'PressStart2P', fontSize: 12, textAlign: 'center', marginBottom: 10 }}>
+                      You can only add classes/events for your own account.
+                    </Text>
+                  ) : (
                     <>
-                      <View style={styles.semesterContainer}>
-                        <Text style={styles.inputLabel}>Semester</Text>
-                        <DropDownPicker
-                          open={semesterOpen}
-                          value={semester}
-                          items={[
-                            { label: 'Fall 2025', value: 'Fall 2025' },
-                            { label: 'Spring 2026', value: 'Spring 2026' }
-                          ]}
-                          setOpen={setSemesterOpen}
-                          setValue={setSemester}
-                          style={styles.picker}
-                          dropDownContainerStyle={styles.pickerDropdown}
-                          textStyle={styles.pickerText}
-                          placeholder="Select semester"
-                          placeholderStyle={styles.pickerPlaceholder}
-                          zIndex={3000}
-                        />
+                      <Text style={styles.eventCardTitle}>
+                        {isEvent ? 'Add New Event' : 'Add New Class'}
+                      </Text>
+                      {!isEvent && (
+                        <View style={styles.inputContainer}>
+                          <Text style={styles.inputLabel}>Class Name</Text>
+                          <TextInput
+                            style={styles.input}
+                            value={className}
+                            onChangeText={setClassName}
+                            placeholder="Enter class name"
+                            placeholderTextColor="#d1b3ff"
+                          />
+                        </View>
+                      )}
+                      {isEvent && (
+                        <View style={styles.inputContainer}>
+                          <Text style={styles.inputLabel}>Event Description</Text>
+                          <TextInput
+                            style={styles.input}
+                            value={eventDescription}
+                            onChangeText={setEventDescription}
+                            placeholder="Enter event description"
+                            placeholderTextColor="#d1b3ff"
+                          />
+                        </View>
+                      )}
+                      <View style={styles.timeContainer}>
+                        <View style={styles.timeInput}>
+                          <Text style={styles.inputLabel}>Start Time</Text>
+                          <TextInput
+                            style={styles.input}
+                            value={startTime}
+                            onChangeText={setStartTime}
+                            placeholder="HH:MM"
+                            placeholderTextColor="#d1b3ff"
+                          />
+                        </View>
+                        <View style={styles.timeInput}>
+                          <Text style={styles.inputLabel}>End Time</Text>
+                          <TextInput
+                            style={styles.input}
+                            value={endTime}
+                            onChangeText={setEndTime}
+                            placeholder="HH:MM"
+                            placeholderTextColor="#d1b3ff"
+                          />
+                        </View>
                       </View>
-
-                      <View style={styles.dayContainer}>
-                        <Text style={styles.inputLabel}>Day of Week</Text>
-                        <DropDownPicker
-                          open={dayOpen}
-                          value={day}
-                          items={days}
-                          setOpen={setDayOpen}
-                          setValue={setDay}
-                          style={styles.picker}
-                          dropDownContainerStyle={styles.pickerDropdown}
-                          textStyle={styles.pickerText}
-                          placeholder="Select day"
-                          placeholderStyle={styles.pickerPlaceholder}
-                          zIndex={2000}
-                        />
-                      </View>
+                      {!isEvent && (
+                        <>
+                          <View style={styles.semesterContainer}>
+                            <Text style={styles.inputLabel}>Semester</Text>
+                            <DropDownPicker
+                              open={semesterOpen}
+                              value={semester}
+                              items={[
+                                { label: 'Fall 2025', value: 'Fall 2025' },
+                                { label: 'Spring 2026', value: 'Spring 2026' }
+                              ]}
+                              setOpen={setSemesterOpen}
+                              setValue={setSemester}
+                              style={styles.picker}
+                              dropDownContainerStyle={styles.pickerDropdown}
+                              textStyle={styles.pickerText}
+                              placeholder="Select semester"
+                              placeholderStyle={styles.pickerPlaceholder}
+                              zIndex={3000}
+                            />
+                          </View>
+                          <View style={styles.dayContainer}>
+                            <Text style={styles.inputLabel}>Day of Week</Text>
+                            <DropDownPicker
+                              open={dayOpen}
+                              value={day}
+                              items={days}
+                              setOpen={setDayOpen}
+                              setValue={setDay}
+                              style={styles.picker}
+                              dropDownContainerStyle={styles.pickerDropdown}
+                              textStyle={styles.pickerText}
+                              placeholder="Select day"
+                              placeholderStyle={styles.pickerPlaceholder}
+                              zIndex={2000}
+                            />
+                          </View>
+                        </>
+                      )}
+                      <TouchableOpacity 
+                        style={styles.addButton}
+                        onPress={handleAddClass}
+                      >
+                        <Text style={styles.addButtonText}>
+                          {isEvent ? 'Add Event' : 'Add Class'}
+                        </Text>
+                      </TouchableOpacity>
                     </>
                   )}
-
-                  <TouchableOpacity 
-                    style={styles.addButton}
-                    onPress={handleAddClass}
-                  >
-                    <Text style={styles.addButtonText}>
-                      {isEvent ? 'Add Event' : 'Add Class'}
-                    </Text>
-                  </TouchableOpacity>
                 </Animatable.View>
               )}
 
