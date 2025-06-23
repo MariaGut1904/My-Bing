@@ -1,13 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, SafeAreaView, ScrollView, Dimensions, Image, FlatList, Keyboard, ImageBackground, TouchableWithoutFeedback, Switch, AppState } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, SafeAreaView, ScrollView, Dimensions, Image, FlatList, Keyboard, ImageBackground, TouchableWithoutFeedback, Switch, AppState, Animated } from 'react-native';
 import DropDownPicker from 'react-native-dropdown-picker';
 import * as Animatable from 'react-native-animatable';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Calendar } from 'react-native-calendars';
+import { MonthCalendar } from '@quidone/react-native-calendars';
 import { useSchedule } from './ScheduleContext';
 import { useAuth } from './AuthContext';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 
 const SchedulePlanner = () => {
   const { scheduleData, setScheduleData } = useSchedule();
@@ -24,76 +24,79 @@ const SchedulePlanner = () => {
   const [markedDates, setMarkedDates] = useState({});
   const [selectedDate, setSelectedDate] = useState(null);
   const [isEvent, setIsEvent] = useState(false);
-  const [isShared, setIsShared] = useState(false);
   const [eventDescription, setEventDescription] = useState('');
   const [currentUser, setCurrentUser] = useState(authUser || 'Maria');
   const [showEventsInCalendar, setShowEventsInCalendar] = useState(true);
   const [semesterOpen, setSemesterOpen] = useState(false);
   const [dayOpen, setDayOpen] = useState(false);
-  const [userPickerOpen, setUserPickerOpen] = useState(false);
-  const [userPickerValue, setUserPickerValue] = useState(authUser || 'Maria');
-  const [userPickerItems, setUserPickerItems] = useState([
-    { label: 'Maria', value: 'Maria' },
-    { label: 'Luna', value: 'Luna' },
-    { label: 'Reni', value: 'Reni' },
-    { label: 'Sheila', value: 'Sheila' },
-  ]);
+  const [allClassesFull, setAllClassesFull] = useState([]);
+  const [isComparing, setIsComparing] = useState(false);
+  const [users, setUsers] = useState(['Maria', 'Luna', 'Reni', 'Sheila']);
 
-  // Load classes when component mounts
+  // States for new time dropdowns
+  const [startTimeHour, setStartTimeHour] = useState(null);
+  const [startTimeMinute, setStartTimeMinute] = useState(null);
+  const [startTimeAmPm, setStartTimeAmPm] = useState(null);
+  const [endTimeHour, setEndTimeHour] = useState(null);
+  const [endTimeMinute, setEndTimeMinute] = useState(null);
+  const [endTimeAmPm, setEndTimeAmPm] = useState(null);
+
+  // States for time dropdowns open/close
+  const [startHourOpen, setStartHourOpen] = useState(false);
+  const [startMinuteOpen, setStartMinuteOpen] = useState(false);
+  const [startAmPmOpen, setStartAmPmOpen] = useState(false);
+  const [endHourOpen, setEndHourOpen] = useState(false);
+  const [endMinuteOpen, setEndMinuteOpen] = useState(false);
+  const [endAmPmOpen, setEndAmPmOpen] = useState(false);
+
+  // States for new date picker
+  const [showDatePicker, setShowDatePicker] = useState(false);
+
+  // Fix: use useRef() instead of React.createRef() for functional components
+  const groupScrollRef = useRef();
+  const groupVerticalScrollRef = useRef();
+
+  // Load classes when component mounts or user/semester changes
   useEffect(() => {
     const loadClasses = async () => {
       try {
-        console.log('Loading classes for user:', currentUser);
         const savedClasses = await AsyncStorage.getItem('allClasses');
-        console.log('Raw saved classes:', savedClasses);
-        
-        if (savedClasses) {
-          const parsedClasses = JSON.parse(savedClasses);
-          console.log('Parsed classes:', parsedClasses);
-          
-          // Load classes that are either created by current user or shared
-          const relevantClasses = parsedClasses.filter(cls => {
-            const isRelevant = cls.creator === currentUser || cls.isShared;
-            console.log('Class:', cls.name, 'isRelevant:', isRelevant, 'creator:', cls.creator, 'isShared:', cls.isShared);
-            return isRelevant;
-          });
-          
-          console.log('Setting relevant classes:', relevantClasses);
-          setAllClasses(relevantClasses);
-          setScheduleData(relevantClasses);
-          
-          // Update marked dates for all loaded classes
-          const newMarkedDates = {};
-          relevantClasses.forEach(item => {
-            if (item.isRecurring) {
-              const semesterDates = getSemesterDates(item.semester);
-              let currentDate = new Date(semesterDates.start);
-              while (currentDate <= semesterDates.end) {
-                if (currentDate.getDay() === item.day) {
-                  const dateStr = currentDate.toISOString().split('T')[0];
-                  newMarkedDates[dateStr] = { 
-                    marked: true, 
-                    dotColor: item.semester === semester ? '#a259c6' : '#d1b3ff',
-                    selected: item.semester === semester
-                  };
-                }
-                currentDate.setDate(currentDate.getDate() + 1);
+        let fullList = savedClasses ? JSON.parse(savedClasses) : [];
+        setAllClassesFull(fullList);
+        // Only filter for display
+        const relevantClasses = fullList.filter(cls => cls.creator === currentUser || cls.isShared);
+        setAllClasses(relevantClasses);
+        setScheduleData(relevantClasses);
+        // Update marked dates for all loaded classes
+        const newMarkedDates = {};
+        relevantClasses.forEach(item => {
+          if (item.isRecurring) {
+            const semesterDates = getSemesterDates(item.semester);
+            let currentDate = new Date(semesterDates.start);
+            while (currentDate <= semesterDates.end) {
+              if (currentDate.getDay() === item.day) {
+                const dateStr = currentDate.toISOString().split('T')[0];
+                newMarkedDates[dateStr] = { 
+                  marked: true, 
+                  dotColor: item.semester === semester ? '#a259c6' : '#d1b3ff',
+                  selected: item.semester === semester
+                };
               }
-            } else {
-              newMarkedDates[item.date] = { 
-                marked: true, 
-                dotColor: item.semester === semester ? '#a259c6' : '#d1b3ff',
-                selected: item.semester === semester
-              };
+              currentDate.setDate(currentDate.getDate() + 1);
             }
-          });
-          setMarkedDates(newMarkedDates);
-        }
+          } else {
+            newMarkedDates[item.date] = { 
+              marked: true, 
+              dotColor: item.semester === semester ? '#a259c6' : '#d1b3ff',
+              selected: item.semester === semester
+            };
+          }
+        });
+        setMarkedDates(newMarkedDates);
       } catch (error) {
         console.error('Error loading classes:', error);
       }
     };
-
     loadClasses();
   }, [currentUser, semester]);
 
@@ -114,41 +117,52 @@ const SchedulePlanner = () => {
     saveClasses();
   }, [allClasses]);
 
-  const resetSchedule = async () => {
-    Alert.alert(
-      "Reset Schedule",
-      "Are you sure you want to clear all classes?",
-      [
-        { text: "Cancel", style: "cancel" },
-        { 
-          text: "Reset", 
-          onPress: async () => {
-            setAllClasses([]);
-            setDailyClasses([]);
-            setMarkedDates({});
-            await AsyncStorage.removeItem('classes');
-          }
-        }
-      ]
-    );
-  };
-
+  // Update handleDeleteAll to recalculate marked dates from allClassesFull after deletion
   const handleDeleteAll = () => {
     Alert.alert(
       "Delete All",
-      "Are you sure you want to delete all classes and events? This cannot be undone.",
+      "Are you sure you want to delete all your classes and events? This cannot be undone.",
       [
-        {
-          text: "Cancel",
-          style: "cancel"
-        },
+        { text: "Cancel", style: "cancel" },
         {
           text: "Delete All",
           style: "destructive",
-          onPress: () => {
-            setAllClasses([]);
-            setScheduleData([]);
-            Alert.alert("Success", "All classes and events have been deleted.");
+          onPress: async () => {
+            // Remove only current user's items (including their shared items)
+            const updatedFull = allClassesFull.filter(item => item.creator !== currentUser);
+            setAllClassesFull(updatedFull);
+            await AsyncStorage.setItem('allClasses', JSON.stringify(updatedFull));
+            // Update filtered lists for display
+            const relevantClasses = updatedFull.filter(cls => cls.creator === currentUser || cls.isShared);
+            setAllClasses(relevantClasses);
+            setScheduleData(relevantClasses);
+            // Update marked dates using updatedFull
+            const newMarkedDates = {};
+            updatedFull.forEach(item => {
+              if (item.isRecurring) {
+                const semesterDates = getSemesterDates(item.semester);
+                let currentDate = new Date(semesterDates.start);
+                while (currentDate <= semesterDates.end) {
+                  if (currentDate.getDay() === item.day) {
+                    const dateStr = currentDate.toISOString().split('T')[0];
+                    newMarkedDates[dateStr] = { 
+                      marked: true, 
+                      dotColor: item.semester === semester ? '#a259c6' : '#d1b3ff',
+                      selected: item.semester === semester
+                    };
+                  }
+                  currentDate.setDate(currentDate.getDate() + 1);
+                }
+              } else if (item.date) {
+                newMarkedDates[item.date] = { 
+                  marked: true, 
+                  dotColor: item.semester === semester ? '#a259c6' : '#d1b3ff',
+                  selected: item.semester === semester
+                };
+              }
+            });
+            setMarkedDates(newMarkedDates);
+            Alert.alert("Success", "All your classes and events have been deleted.");
           }
         }
       ]
@@ -194,6 +208,7 @@ const SchedulePlanner = () => {
       }
     }
     let newItem;
+    const semesterDates = getSemesterDates(semester);
     if (!isEvent) {
       newItem = {
         id: Date.now().toString(),
@@ -204,19 +219,12 @@ const SchedulePlanner = () => {
         day: day,
         isRecurring: true,
         creator: currentUser,
-        semester: semester
+        semester: semester,
+        semesterStart: semesterDates.start.toISOString().split('T')[0],
+        semesterEnd: semesterDates.end.toISOString().split('T')[0],
       };
     } else {
-      const semesterDates = getSemesterDates(semester);
       const selectedDateObj = new Date(selectedDate);
-      if (selectedDateObj < semesterDates.start || selectedDateObj > semesterDates.end) {
-        Alert.alert(
-          "Invalid Date",
-          `Please select a date between ${semesterDates.start.toLocaleDateString()} and ${semesterDates.end.toLocaleDateString()} for ${semester}`,
-          [{ text: "OK" }]
-        );
-        return;
-      }
       newItem = {
         id: Date.now().toString(),
         type: 'event',
@@ -226,17 +234,18 @@ const SchedulePlanner = () => {
         date: selectedDate,
         isRecurring: false,
         creator: currentUser,
-        semester: semester
+        semester: semester,
+        semesterStart: semesterDates.start.toISOString().split('T')[0],
+        semesterEnd: semesterDates.end.toISOString().split('T')[0],
       };
     }
     try {
-      // Load full list
-      const savedClasses = await AsyncStorage.getItem('allClasses');
-      let allClassesFull = savedClasses ? JSON.parse(savedClasses) : [];
-      allClassesFull.push(newItem);
-      await AsyncStorage.setItem('allClasses', JSON.stringify(allClassesFull));
-      // Now filter for current user for display
-      const relevantClasses = allClassesFull.filter(cls => cls.creator === currentUser || cls.isShared);
+      // Use allClassesFull for the full list
+      let updatedFull = [...allClassesFull, newItem];
+      setAllClassesFull(updatedFull);
+      await AsyncStorage.setItem('allClasses', JSON.stringify(updatedFull));
+      // Only filter for display
+      const relevantClasses = updatedFull.filter(cls => cls.creator === currentUser || cls.isShared);
       setAllClasses(relevantClasses);
       setScheduleData(relevantClasses);
       // Update marked dates as before
@@ -265,179 +274,183 @@ const SchedulePlanner = () => {
       setMarkedDates(newMarkedDates);
       // Reset form
       setClassName('');
-      setStartTime('');
-      setEndTime('');
+      setStartTimeHour(null);
+      setStartTimeMinute(null);
+      setStartTimeAmPm(null);
+      setEndTimeHour(null);
+      setEndTimeMinute(null);
+      setEndTimeAmPm(null);
       setDay(null);
       setEventDescription('');
       setSelectedDate(null);
     } catch (error) {
-      Alert.alert('Error', 'Failed to save class: ' + error.message);
+      Alert.alert('Error', 'Failed to save item: ' + error.message);
     }
   };
 
-  const handleDayPress = (day) => {
-    // Use the exact date from the calendar
-    setSelectedDate(day.dateString);
-    
-    const [year, month, date] = day.dateString.split('-').map(Number);
-    const selectedDateObj = new Date(year, month - 1, date);
-    const selectedDay = selectedDateObj.getDay();
-    
-    console.log(`Selected: ${day.dateString} (${selectedDay})`);
+  const handleDateChange = (event, date) => {
+    setShowDatePicker(false);
+    if (date) {
+      // Correct for timezone offset
+      const timezoneOffset = date.getTimezoneOffset() * 60000;
+      const adjustedDate = new Date(date.getTime() - timezoneOffset);
+      const dateString = adjustedDate.toISOString().split('T')[0];
+      setSelectedDate(dateString);
+      handleDayPress({ day: adjustedDate.toISOString().split('T')[0] });
+    }
+  };
 
-    const filtered = allClasses.filter(cls => {
+  const handleDayPress = (input) => {
+    let dateObj;
+    if (input instanceof Date) {
+      dateObj = input;
+    } else if (typeof input === 'string') {
+      dateObj = new Date(input + 'T00:00:00');
+    } else if (input && typeof input === 'object' && input.day) {
+      dateObj = new Date(input.day + 'T00:00:00');
+    } else {
+      dateObj = new Date();
+    }
+    // Build YYYY-MM-DD in local time
+    const year = dateObj.getFullYear();
+    const month = (dateObj.getMonth() + 1).toString().padStart(2, '0');
+    const day = dateObj.getDate().toString().padStart(2, '0');
+    const dayString = `${year}-${month}-${day}`;
+    setSelectedDate(dayString);
+    const selectedDay = dateObj.getDay();
+    const filtered = allClassesFull.filter(cls => {
+      if (cls.creator !== currentUser) return false;
       if (cls.isRecurring) {
-        const semesterMonths = cls.semester === 'Fall' 
-          ? [7, 8, 9, 10, 11]  // August-December
-          : [0, 1, 2, 3, 4];    // January-May
-        
-        const dayMatch = selectedDay === cls.day;
-        const monthMatch = semesterMonths.includes(selectedDateObj.getMonth());
-        
-        return dayMatch && monthMatch && cls.semester === semester;
+        return cls.day === selectedDay && dayString >= cls.semesterStart && dayString <= cls.semesterEnd;
       } else {
-        return cls.date === day.dateString;
+        return cls.date === dayString;
       }
     });
-
-    console.log('Matching classes:', filtered);
     setDailyClasses(filtered);
   };
 
   const handleShare = async (item) => {
-    // Check if this item is already shared
     try {
-      const savedClasses = await AsyncStorage.getItem('allClasses');
-      let allClassesFull = savedClasses ? JSON.parse(savedClasses) : [];
-      const isAlreadyShared = allClassesFull.some(cls => 
-        cls.isShared && 
-        cls.name === item.name && 
-        cls.startTime === item.startTime && 
-        cls.endTime === item.endTime &&
-        ((cls.day !== undefined && cls.day === item.day) || (cls.date && cls.date === item.date)) &&
-        cls.semester === item.semester
+      const fullList = [...allClassesFull];
+
+      // Check if this exact item from this creator is already shared
+      const isAlreadyShared = fullList.some(cls =>
+        cls.originalId === item.id && cls.isShared
       );
+
       if (isAlreadyShared) {
-        Alert.alert(
-          "Already Shared",
-          "This class or event is already shared with everyone!",
-          [{ text: "OK" }]
-        );
+        Alert.alert("Already Shared", "This item has already been shared.");
         return;
       }
-      // Create a copy of the item with the current user as creator
+
+      // Create a new, distinct shared item
       const sharedItem = {
         ...item,
-        id: Date.now().toString(),
-        creator: currentUser,
+        id: Date.now().toString(), // New ID for the shared copy
+        originalId: item.id, // Keep track of the original
         isShared: true,
-        sharedBy: currentUser,
-        date: item.date,
-        day: item.day,
-        semester: item.semester
+        sharedBy: currentUser, // Person who clicked share
+        // creator field remains the same as the original item's creator
       };
-      // Add the new shared class/event
-      allClassesFull.push(sharedItem);
-      await AsyncStorage.setItem('allClasses', JSON.stringify(allClassesFull));
-      // Update state for current user
-      const relevantClasses = allClassesFull.filter(cls => cls.creator === currentUser || cls.isShared);
-      setAllClasses(relevantClasses);
-      setScheduleData(relevantClasses);
-      // Update marked dates for the shared item
-      const newMarkedDates = { ...markedDates };
+
+      const updatedFullList = [...fullList, sharedItem];
+      setAllClassesFull(updatedFullList);
+      await AsyncStorage.setItem('allClasses', JSON.stringify(updatedFullList));
+
+      // Re-calculate marked dates
+      const newMarkedDates = getMarkedDates();
+      setMarkedDates(newMarkedDates);
+
+      Alert.alert("Shared!", `${item.type === 'class' ? 'Class' : 'Event'} has been shared.`);
+
+    } catch (error) {
+      Alert.alert('Error', 'Failed to share item: ' + error.message);
+    }
+  };
+
+  const getDailySchedule = () => {
+    if (!selectedDate) return [];
+    const selectedDateObj = new Date(selectedDate + 'T00:00:00');
+    const selectedDay = selectedDateObj.getDay();
+    return allClassesFull.filter(item => {
+      // Only show the original (not shared) items for the current user
+      if (item.creator !== currentUser) return false;
+      if (item.isShared) return false;
+      if (item.isRecurring) {
+        return item.day === selectedDay && selectedDate >= item.semesterStart && selectedDate <= item.semesterEnd;
+      }
+      return item.date === selectedDate;
+    });
+  };
+
+  const getMarkedDates = () => {
+    // Use a map to merge dots for the same date
+    const dateMap = {};
+    allClassesFull.forEach(item => {
+      const dotColor = item.semester === semester ? '#a259c6' : '#d1b3ff';
       if (item.isRecurring) {
         const semesterDates = getSemesterDates(item.semester);
         let currentDate = new Date(semesterDates.start);
         while (currentDate <= semesterDates.end) {
           if (currentDate.getDay() === item.day) {
             const dateStr = currentDate.toISOString().split('T')[0];
-            newMarkedDates[dateStr] = { 
-              marked: true, 
-              dotColor: item.semester === semester ? '#a259c6' : '#d1b3ff',
-              selected: item.semester === semester
-            };
+            if (!dateMap[dateStr]) {
+              dateMap[dateStr] = { dots: [{ color: dotColor }] };
+            } else {
+              // Merge dots if not already present
+              if (!dateMap[dateStr].dots.some(dot => dot.color === dotColor)) {
+                dateMap[dateStr].dots.push({ color: dotColor });
+              }
+            }
           }
           currentDate.setDate(currentDate.getDate() + 1);
         }
-      } else {
-        newMarkedDates[item.date] = { 
-          marked: true, 
-          dotColor: item.semester === semester ? '#a259c6' : '#d1b3ff',
-          selected: item.semester === semester
-        };
+      } else if (item.date) {
+        if (!dateMap[item.date]) {
+          dateMap[item.date] = { dots: [{ color: dotColor }] };
+        } else {
+          if (!dateMap[item.date].dots.some(dot => dot.color === dotColor)) {
+            dateMap[item.date].dots.push({ color: dotColor });
+          }
+        }
       }
-      setMarkedDates(newMarkedDates);
-      Alert.alert(
-        "Shared!",
-        `${item.type === 'class' ? 'Class' : 'Event'} has been shared with everyone!`,
-        [{ text: "OK" }]
-      );
-    } catch (error) {
-      console.error('Error sharing class/event:', error);
-      Alert.alert(
-        "Error",
-        "Failed to share the class or event. Please try again.",
-        [{ text: "OK" }]
-      );
+    });
+    if (selectedDate) {
+      dateMap[selectedDate] = { ...(dateMap[selectedDate] || {}), selected: true };
     }
+    return Object.entries(dateMap);
   };
 
-  const getDailySchedule = () => {
-    if (!selectedDate) return [];
-    
-    // Use the exact date string from the calendar
-    const [year, month, date] = selectedDate.split('-').map(Number);
-    const selectedDateObj = new Date(year, month - 1, date);
-    const selectedDay = selectedDateObj.getDay();
-    const selectedDateStr = selectedDate;
-    
-    console.log('Getting schedule for:', selectedDateStr, 'Day:', selectedDay);
-    console.log('Current user:', currentUser);
-    console.log('All classes:', allClasses);
-    
-    // Use a Set to track unique classes
-    const uniqueClasses = new Set();
-    
-    const filteredClasses = allClasses.filter(item => {
-      // Create a unique key for this class
-      const classKey = `${item.name}-${item.startTime}-${item.endTime}-${item.day}`;
-      
-      // Skip if we've already seen this class
-      if (uniqueClasses.has(classKey)) {
-        return false;
-      }
-      
-      // Add to our set of seen classes
-      uniqueClasses.add(classKey);
-      
-      // For recurring classes
-      if (item.isRecurring) {
-        if (item.day === selectedDay) {
-          // Show if it's the user's class or if it's shared
-          const shouldShow = item.creator === currentUser || item.isShared;
-          console.log('Recurring class:', item.name, 'shouldShow:', shouldShow);
-          return shouldShow;
+  const handleDeleteItem = (item) => {
+    Alert.alert(
+      'Delete',
+      `Are you sure you want to delete "${item.name}"?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete', style: 'destructive', onPress: async () => {
+            // Only remove if the item belongs to the current user
+            const updatedFull = allClassesFull.filter(i => !(i.id === item.id && i.creator === currentUser));
+            setAllClassesFull(updatedFull);
+            await AsyncStorage.setItem('allClasses', JSON.stringify(updatedFull));
+            // Update filtered lists for display
+            const relevantClasses = updatedFull.filter(cls => cls.creator === currentUser || cls.isShared);
+            setAllClasses(relevantClasses);
+            setScheduleData(relevantClasses);
+            // Update marked dates
+            const newMarkedDates = getMarkedDates();
+            setMarkedDates(newMarkedDates);
+          }
         }
-        return false;
-      }
-      
-      // For one-time events
-      if (item.date === selectedDateStr) {
-        // Show if it's the user's class or if it's shared
-        const shouldShow = item.creator === currentUser || item.isShared;
-        console.log('One-time event:', item.name, 'shouldShow:', shouldShow);
-        return shouldShow;
-      }
-      
-      return false;
-    });
-
-    console.log('Filtered classes:', filteredClasses);
-    return filteredClasses;
+      ]
+    );
   };
 
   const renderDailyItem = ({ item }) => (
-    <Animatable.View animation="fadeIn" style={styles.dailyItem}>
+    <Animatable.View
+      animation="fadeIn"
+      style={styles.dailyItem}
+    >
       <View style={styles.dailyItemContent}>
         <View style={styles.dailyItemInfo}>
           <Text style={styles.dailyItemTitle}>
@@ -448,9 +461,19 @@ const SchedulePlanner = () => {
             {item.startTime} - {item.endTime}
           </Text>
         </View>
+        {/* Show delete icon if this is the current user's item */}
+        {item.creator === currentUser && (
+          <TouchableOpacity
+            style={styles.deleteButton}
+            onPress={() => handleDeleteItem(item)}
+          >
+            <Image source={require('../assets/trash.png')} style={styles.deleteIcon} />
+          </TouchableOpacity>
+        )}
       </View>
-      {!isShared && item.creator === currentUser && (
-        <TouchableOpacity 
+      {/* Show share button only on original, un-shared items in the "Your Schedule" tab */}
+      {!item.isShared && (
+        <TouchableOpacity
           style={styles.shareButton}
           onPress={() => handleShare(item)}
         >
@@ -460,47 +483,13 @@ const SchedulePlanner = () => {
     </Animatable.View>
   );
 
-  const getMarkedDates = () => {
-    const marked = {};
-    
-    allClasses.forEach(cls => {
-      if (cls.isRecurring) {
-        // For recurring classes, mark all dates in the semester
-        const semesterDates = getSemesterDates(cls.semester);
-        let currentDate = new Date(semesterDates.start);
-        while (currentDate <= semesterDates.end) {
-          if (currentDate.getDay() === cls.day) {
-            const dateStr = currentDate.toISOString().split('T')[0];
-            marked[dateStr] = { 
-              marked: true, 
-              dotColor: cls.semester === semester ? '#a259c6' : '#d1b3ff',
-              selected: cls.semester === semester
-            };
-          }
-          currentDate.setDate(currentDate.getDate() + 1);
-        }
-      } else {
-        // For one-time events, mark the specific date
-        marked[cls.date] = { 
-          marked: true, 
-          dotColor: cls.semester === semester ? '#a259c6' : '#d1b3ff',
-          selected: cls.semester === semester
-        };
-      }
-    });
-    
-    return marked;
-  };
-
   // Add useEffect to update daily schedule when selectedDate changes
   useEffect(() => {
     if (selectedDate) {
       const schedule = getDailySchedule();
-      console.log('Updating daily schedule for date:', selectedDate);
-      console.log('Schedule:', schedule);
       setDailyClasses(schedule);
     }
-  }, [selectedDate, allClasses, isShared]);
+  }, [selectedDate, allClassesFull, isComparing]);
 
   // Add console.log for debugging
   useEffect(() => {
@@ -527,8 +516,75 @@ const SchedulePlanner = () => {
   }, [currentUser, semester]);
 
   useEffect(() => {
-    setCurrentUser(userPickerValue);
-  }, [userPickerValue]);
+    setCurrentUser(authUser);
+  }, [authUser]);
+
+  // Helper function to generate time slots for the day view
+  const generateTimeSlots = () => {
+    // 8 AM to 11 PM
+    const slots = [];
+    for (let i = 8; i < 12; i++) {
+      slots.push(`${i} AM`);
+    }
+    slots.push('12 PM');
+    for (let i = 1; i <= 11; i++) {
+      slots.push(`${i} PM`);
+    }
+    return slots;
+  };
+
+  // Helper to get event for a user at a specific time
+  const getEventForUserAtTime = (user, timeLabel) => {
+    if (!selectedDate) return 'Free';
+    // Convert '8 AM', '12 PM', etc. to 24-hour
+    const [hourStr, period] = timeLabel.split(' ');
+    let hour = parseInt(hourStr, 10);
+    if (period === 'PM' && hour !== 12) hour += 12;
+    if (period === 'AM' && hour === 12) hour = 0;
+    const selectedDateObj = new Date(selectedDate + 'T00:00:00');
+    const selectedDay = selectedDateObj.getDay();
+    const event = allClassesFull.find(item => {
+      if (item.creator !== user) return false;
+      const startHour = parseInt(item.startTime.split(':')[0], 10);
+      const endHour = parseInt(item.endTime.split(':')[0], 10);
+      if (hour >= startHour && hour < endHour) {
+        if (item.isRecurring) {
+          return item.day === selectedDay;
+        }
+        return item.date === selectedDate;
+      }
+      return false;
+    });
+    return event ? event.name : 'Free';
+  };
+
+  useEffect(() => {
+    if (startTimeHour && startTimeMinute && startTimeAmPm) {
+      let hour = parseInt(startTimeHour, 10);
+      if (startTimeAmPm === 'PM' && hour < 12) {
+        hour += 12;
+      }
+      if (startTimeAmPm === 'AM' && hour === 12) {
+        hour = 0; // Midnight case
+      }
+      const formattedHour = hour < 10 ? `0${hour}` : `${hour}`;
+      setStartTime(`${formattedHour}:${startTimeMinute}`);
+    }
+  }, [startTimeHour, startTimeMinute, startTimeAmPm]);
+
+  useEffect(() => {
+    if (endTimeHour && endTimeMinute && endTimeAmPm) {
+      let hour = parseInt(endTimeHour, 10);
+      if (endTimeAmPm === 'PM' && hour < 12) {
+        hour += 12;
+      }
+      if (endTimeAmPm === 'AM' && hour === 12) {
+        hour = 0; // Midnight case
+      }
+      const formattedHour = hour < 10 ? `0${hour}` : `${hour}`;
+      setEndTime(`${formattedHour}:${endTimeMinute}`);
+    }
+  }, [endTimeHour, endTimeMinute, endTimeAmPm]);
 
   return (
     <ImageBackground source={require('../assets/pixel-bg.png')} style={styles.bg}>
@@ -543,50 +599,34 @@ const SchedulePlanner = () => {
             <Text style={styles.deleteButtonText}>Delete All</Text>
           </TouchableOpacity>
         </Animatable.View>
-        {/* User Picker */}
-        <View style={{ zIndex: 4000, marginHorizontal: 20, marginTop: 10 }}>
-          <DropDownPicker
-            open={userPickerOpen}
-            value={userPickerValue}
-            items={userPickerItems}
-            setOpen={setUserPickerOpen}
-            setValue={setUserPickerValue}
-            setItems={setUserPickerItems}
-            placeholder="Select user to view schedule"
-            style={{ backgroundColor: '#fff0fa', borderColor: '#a259c6', borderWidth: 2, borderRadius: 10, marginBottom: 10 }}
-            dropDownContainerStyle={{ backgroundColor: '#fff0fa', borderColor: '#a259c6', borderRadius: 10 }}
-            textStyle={{ color: '#a259c6', fontFamily: 'PressStart2P', fontSize: 12 }}
-            zIndex={4000}
-          />
-        </View>
         <ScrollView contentContainerStyle={styles.scrollContainer}>
           <View style={styles.toggleContainer}>
-            <TouchableOpacity 
-              style={[styles.toggleButton, !isEvent && !isShared && styles.activeToggle]}
+            <TouchableOpacity
+              style={[styles.toggleButton, !isEvent && !isComparing && styles.activeToggle]}
               onPress={() => {
                 setIsEvent(false);
-                setIsShared(false);
+                setIsComparing(false);
               }}
             >
               <Text style={styles.toggleText}>Class</Text>
             </TouchableOpacity>
-            <TouchableOpacity 
-              style={[styles.toggleButton, isEvent && !isShared && styles.activeToggle]}
+            <TouchableOpacity
+              style={[styles.toggleButton, isEvent && !isComparing && styles.activeToggle]}
               onPress={() => {
                 setIsEvent(true);
-                setIsShared(false);
+                setIsComparing(false);
               }}
             >
               <Text style={styles.toggleText}>Event</Text>
             </TouchableOpacity>
-            <TouchableOpacity 
-              style={[styles.toggleButton, isShared && styles.activeToggle]}
+            <TouchableOpacity
+              style={[styles.toggleButton, isComparing && styles.activeToggle]}
               onPress={() => {
-                setIsShared(true);
+                setIsComparing(true);
                 setIsEvent(false);
               }}
             >
-              <Text style={styles.toggleText}>Shared</Text>
+              <Text style={styles.toggleText}>Compare</Text>
             </TouchableOpacity>
           </View>
 
@@ -594,157 +634,290 @@ const SchedulePlanner = () => {
             <View style={styles.content}>
               {/* Calendar */}
               <Animatable.View animation="fadeInUp" style={styles.calendarContainer}>
-                <Calendar
+                <MonthCalendar
+                  selectedDay={selectedDate ? new Date(selectedDate) : undefined}
                   onDayPress={handleDayPress}
-                  markedDates={getMarkedDates()}
+                  markedDays={getMarkedDates()}
                   theme={{
                     calendarBackground: '#fff0fa',
-                    textSectionTitleColor: '#6e3abf',
-                    selectedDayBackgroundColor: '#a259c6',
-                    selectedDayTextColor: '#fff',
+                    monthTitleColor: '#6e3abf',
+                    dayContainerSize: 32,
+                    daySelectedBgColor: { value: '#a259c6' },
+                    daySelectedColor: { value: '#ffffff' },
                     todayTextColor: '#ff69b4',
                     dayTextColor: '#6e3abf',
-                    textDisabledColor: '#d1b3ff',
-                    dotColor: '#6e3abf',
-                    selectedDotColor: '#fff',
-                    arrowColor: '#6e3abf',
-                    monthTextColor: '#6e3abf',
-                    indicatorColor: '#6e3abf',
-                    textDayFontFamily: 'PressStart2P',
-                    textMonthFontFamily: 'PressStart2P',
-                    textDayHeaderFontFamily: 'PressStart2P',
+                    dayDisabledOpacity: 0.4,
+                    dayDotSize: 4,
                   }}
                 />
               </Animatable.View>
 
               {/* Add Form - Only show in Class and Event tabs */}
-              {!isShared && (
+              {!isComparing && (
                 <Animatable.View animation="fadeInUp" delay={100} style={styles.eventCard}>
-                  {userPickerValue !== authUser ? (
-                    <Text style={{ color: '#a259c6', fontFamily: 'PressStart2P', fontSize: 12, textAlign: 'center', marginBottom: 10 }}>
-                      You can only add classes/events for your own account.
-                    </Text>
-                  ) : (
-                    <>
-                      <Text style={styles.eventCardTitle}>
-                        {isEvent ? 'Add New Event' : 'Add New Class'}
-                      </Text>
-                      {!isEvent && (
-                        <View style={styles.inputContainer}>
-                          <Text style={styles.inputLabel}>Class Name</Text>
-                          <TextInput
-                            style={styles.input}
-                            value={className}
-                            onChangeText={setClassName}
-                            placeholder="Enter class name"
-                            placeholderTextColor="#d1b3ff"
-                          />
-                        </View>
-                      )}
-                      {isEvent && (
-                        <View style={styles.inputContainer}>
-                          <Text style={styles.inputLabel}>Event Description</Text>
-                          <TextInput
-                            style={styles.input}
-                            value={eventDescription}
-                            onChangeText={setEventDescription}
-                            placeholder="Enter event description"
-                            placeholderTextColor="#d1b3ff"
-                          />
-                        </View>
-                      )}
-                      <View style={styles.timeContainer}>
-                        <View style={styles.timeInput}>
-                          <Text style={styles.inputLabel}>Start Time</Text>
-                          <TextInput
-                            style={styles.input}
-                            value={startTime}
-                            onChangeText={setStartTime}
-                            placeholder="HH:MM"
-                            placeholderTextColor="#d1b3ff"
-                          />
-                        </View>
-                        <View style={styles.timeInput}>
-                          <Text style={styles.inputLabel}>End Time</Text>
-                          <TextInput
-                            style={styles.input}
-                            value={endTime}
-                            onChangeText={setEndTime}
-                            placeholder="HH:MM"
-                            placeholderTextColor="#d1b3ff"
-                          />
-                        </View>
+                  <Text style={styles.eventCardTitle}>
+                    {isEvent ? 'Add New Event' : 'Add New Class'}
+                  </Text>
+                  {!isEvent && (
+                    <View style={styles.inputContainer}>
+                      <Text style={styles.inputLabel}>Class Name</Text>
+                      <TextInput
+                        style={styles.input}
+                        value={className}
+                        onChangeText={setClassName}
+                        placeholder="Enter class name"
+                        placeholderTextColor="#d1b3ff"
+                      />
+                    </View>
+                  )}
+                  {isEvent && (
+                    <View style={styles.inputContainer}>
+                      <Text style={styles.inputLabel}>Event Description</Text>
+                      <TextInput
+                        style={styles.input}
+                        value={eventDescription}
+                        onChangeText={setEventDescription}
+                        placeholder="Enter event description"
+                        placeholderTextColor="#d1b3ff"
+                      />
+                    </View>
+                  )}
+                  <View style={[styles.timeContainer, { zIndex: 6 }]}>
+                    <View style={styles.timeInput}>
+                      <Text style={styles.inputLabel}>Start Time</Text>
+                      <View style={styles.timeRowContainer}>
+                        <DropDownPicker
+                          open={startHourOpen}
+                          value={startTimeHour}
+                          items={Array.from({ length: 12 }, (_, i) => ({ label: `${i + 1}`, value: `${i + 1}` }))}
+                          setOpen={setStartHourOpen}
+                          setValue={setStartTimeHour}
+                          placeholder="Hr"
+                          containerStyle={{ flex: 1, marginRight: 5 }}
+                          style={styles.picker}
+                          dropDownContainerStyle={styles.pickerDropdown}
+                          textStyle={styles.pickerText}
+                          listMode="SCROLLVIEW"
+                        />
+                        <DropDownPicker
+                          open={startMinuteOpen}
+                          value={startTimeMinute}
+                          items={[
+                            { label: '00', value: '00' },
+                            { label: '15', value: '15' },
+                            { label: '30', value: '30' },
+                            { label: '45', value: '45' },
+                          ]}
+                          setOpen={setStartMinuteOpen}
+                          setValue={setStartTimeMinute}
+                          placeholder="Min"
+                          containerStyle={{ flex: 1, marginRight: 5 }}
+                          style={styles.picker}
+                          dropDownContainerStyle={styles.pickerDropdown}
+                          textStyle={styles.pickerText}
+                          listMode="SCROLLVIEW"
+                        />
+                        <DropDownPicker
+                          open={startAmPmOpen}
+                          value={startTimeAmPm}
+                          items={[{ label: 'AM', value: 'AM' }, { label: 'PM', value: 'PM' }]}
+                          setOpen={setStartAmPmOpen}
+                          setValue={setStartTimeAmPm}
+                          placeholder="AM/PM"
+                          containerStyle={{ flex: 1 }}
+                          style={styles.picker}
+                          dropDownContainerStyle={styles.pickerDropdown}
+                          textStyle={styles.pickerText}
+                          listMode="SCROLLVIEW"
+                        />
                       </View>
-                      {!isEvent && (
-                        <>
-                          <View style={styles.semesterContainer}>
-                            <Text style={styles.inputLabel}>Semester</Text>
-                            <DropDownPicker
-                              open={semesterOpen}
-                              value={semester}
-                              items={[
-                                { label: 'Fall 2025', value: 'Fall 2025' },
-                                { label: 'Spring 2026', value: 'Spring 2026' }
-                              ]}
-                              setOpen={setSemesterOpen}
-                              setValue={setSemester}
-                              style={styles.picker}
-                              dropDownContainerStyle={styles.pickerDropdown}
-                              textStyle={styles.pickerText}
-                              placeholder="Select semester"
-                              placeholderStyle={styles.pickerPlaceholder}
-                              zIndex={3000}
-                            />
-                          </View>
-                          <View style={styles.dayContainer}>
-                            <Text style={styles.inputLabel}>Day of Week</Text>
-                            <DropDownPicker
-                              open={dayOpen}
-                              value={day}
-                              items={days}
-                              setOpen={setDayOpen}
-                              setValue={setDay}
-                              style={styles.picker}
-                              dropDownContainerStyle={styles.pickerDropdown}
-                              textStyle={styles.pickerText}
-                              placeholder="Select day"
-                              placeholderStyle={styles.pickerPlaceholder}
-                              zIndex={2000}
-                            />
-                          </View>
-                        </>
-                      )}
-                      <TouchableOpacity 
-                        style={styles.addButton}
-                        onPress={handleAddClass}
-                      >
-                        <Text style={styles.addButtonText}>
-                          {isEvent ? 'Add Event' : 'Add Class'}
-                        </Text>
-                      </TouchableOpacity>
+                    </View>
+                  </View>
+                  <View style={[styles.timeContainer, { zIndex: 5 }]}>
+                    <View style={styles.timeInput}>
+                      <Text style={styles.inputLabel}>End Time</Text>
+                      <View style={styles.timeRowContainer}>
+                        <DropDownPicker
+                          open={endHourOpen}
+                          value={endTimeHour}
+                          items={Array.from({ length: 12 }, (_, i) => ({ label: `${i + 1}`, value: `${i + 1}` }))}
+                          setOpen={setEndHourOpen}
+                          setValue={setEndTimeHour}
+                          placeholder="Hr"
+                          containerStyle={{ flex: 1, marginRight: 5 }}
+                          style={styles.picker}
+                          dropDownContainerStyle={styles.pickerDropdown}
+                          textStyle={styles.pickerText}
+                          listMode="SCROLLVIEW"
+                        />
+                        <DropDownPicker
+                          open={endMinuteOpen}
+                          value={endTimeMinute}
+                          items={[
+                            { label: '00', value: '00' },
+                            { label: '15', value: '15' },
+                            { label: '30', value: '30' },
+                            { label: '45', value: '45' },
+                          ]}
+                          setOpen={setEndMinuteOpen}
+                          setValue={setEndTimeMinute}
+                          placeholder="Min"
+                          containerStyle={{ flex: 1, marginRight: 5 }}
+                          style={styles.picker}
+                          dropDownContainerStyle={styles.pickerDropdown}
+                          textStyle={styles.pickerText}
+                          listMode="SCROLLVIEW"
+                        />
+                        <DropDownPicker
+                          open={endAmPmOpen}
+                          value={endTimeAmPm}
+                          items={[{ label: 'AM', value: 'AM' }, { label: 'PM', value: 'PM' }]}
+                          setOpen={setEndAmPmOpen}
+                          setValue={setEndTimeAmPm}
+                          placeholder="AM/PM"
+                          containerStyle={{ flex: 1 }}
+                          style={styles.picker}
+                          dropDownContainerStyle={styles.pickerDropdown}
+                          textStyle={styles.pickerText}
+                          listMode="SCROLLVIEW"
+                        />
+                      </View>
+                    </View>
+                  </View>
+                  {!isEvent && (
+                    <>
+                      <View style={[styles.inputContainer, { zIndex: 4 }]}>
+                        <Text style={styles.inputLabel}>Semester</Text>
+                        <DropDownPicker
+                          open={semesterOpen}
+                          value={semester}
+                          items={[
+                            { label: 'Fall 2025', value: 'Fall 2025' },
+                            { label: 'Spring 2026', value: 'Spring 2026' }
+                          ]}
+                          setOpen={setSemesterOpen}
+                          setValue={setSemester}
+                          listMode="SCROLLVIEW"
+                          style={styles.picker}
+                          dropDownContainerStyle={styles.pickerDropdown}
+                          textStyle={styles.pickerText}
+                        />
+                      </View>
+                      <View style={[styles.inputContainer, { zIndex: 3 }]}>
+                        <Text style={styles.inputLabel}>Day of Week</Text>
+                        <DropDownPicker
+                          open={dayOpen}
+                          value={day}
+                          items={days}
+                          setOpen={setDayOpen}
+                          setValue={setDay}
+                          listMode="SCROLLVIEW"
+                          style={styles.picker}
+                          dropDownContainerStyle={styles.pickerDropdown}
+                          textStyle={styles.pickerText}
+                        />
+                      </View>
                     </>
                   )}
+                  <TouchableOpacity 
+                    style={styles.addButton}
+                    onPress={handleAddClass}
+                  >
+                    <Text style={styles.addButtonText}>
+                      {isEvent ? 'Add Event' : 'Add Class'}
+                    </Text>
+                  </TouchableOpacity>
                 </Animatable.View>
               )}
 
               {/* Daily Schedule */}
-              <Animatable.View animation="fadeInUp" delay={200} style={styles.dailySchedule}>
-                <Text style={styles.dailyTitle}>
-                  {isShared ? "Shared Schedule" : "Your Schedule"} for {selectedDate ? new Date(selectedDate).toLocaleDateString() : 'Selected Day'}
-                </Text>
-                {getDailySchedule().length > 0 ? (
-                  <FlatList
-                    data={getDailySchedule()}
-                    renderItem={renderDailyItem}
-                    keyExtractor={item => item.id}
-                    style={styles.dailyList}
-                  />
-                ) : (
-                  <Text style={styles.noScheduleText}>
-                    No {isShared ? 'shared ' : ''}schedule for this day
+              {!isComparing && (
+                <Animatable.View animation="fadeInUp" delay={200} style={styles.dailySchedule}>
+                  <Text style={styles.dailyTitle}>
+                    Your Schedule for {selectedDate ? new Date(selectedDate + 'T00:00:00').toLocaleDateString() : 'Selected Day'}
                   </Text>
-                )}
-              </Animatable.View>
+                  {getDailySchedule().length > 0 ? (
+                    <FlatList
+                      data={getDailySchedule()}
+                      renderItem={renderDailyItem}
+                      keyExtractor={item => item.id}
+                      style={styles.dailyList}
+                    />
+                  ) : (
+                    <Text style={styles.noScheduleText}>
+                      No schedule for this day
+                    </Text>
+                  )}
+                </Animatable.View>
+              )}
+
+              {/* Group Schedule View */}
+              {isComparing && selectedDate && (
+                <Animatable.View animation="fadeInUp" delay={200} style={[styles.groupScheduleContainer, { position: 'relative' }]}> 
+                  <Text style={styles.dailyTitle}>Group Schedule for {new Date(selectedDate).toLocaleDateString()}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <TouchableOpacity
+                      style={styles.scrollButton}
+                      onPress={() => {
+                        if (groupScrollRef.current) {
+                          groupScrollRef.current.scrollTo({ x: 0, animated: true });
+                        }
+                      }}
+                    >
+                      <Text style={styles.scrollButtonText}>{'<'}</Text>
+                    </TouchableOpacity>
+                    <ScrollView
+                      horizontal
+                      ref={groupScrollRef}
+                      showsHorizontalScrollIndicator={false}
+                      style={{ flex: 1 }}
+                    >
+                      <ScrollView
+                        ref={groupVerticalScrollRef}
+                        showsVerticalScrollIndicator={true}
+                      >
+                        <View style={{ paddingBottom: 80 }}>
+                          <View style={styles.groupHeaderRow}>
+                            <Text style={styles.timeSlotHeader}>Time</Text>
+                            {users.map(user => <Text key={user} style={styles.userHeader}>{user}</Text>)}
+                          </View>
+                          {generateTimeSlots().map(time => (
+                            <View key={time} style={styles.groupRow}>
+                              <Text style={styles.timeSlot}>{time}</Text>
+                              {users.map(user => (
+                                <Text key={user} style={[styles.scheduleCell, getEventForUserAtTime(user, time) !== 'Free' && styles.busyCell]}>
+                                  {getEventForUserAtTime(user, time)}
+                                </Text>
+                              ))}
+                            </View>
+                          ))}
+                        </View>
+                      </ScrollView>
+                    </ScrollView>
+                    <TouchableOpacity
+                      style={styles.scrollButton}
+                      onPress={() => {
+                        if (groupScrollRef.current) {
+                          groupScrollRef.current.scrollTo({ x: 1000, animated: true });
+                        }
+                      }}
+                    >
+                      <Text style={styles.scrollButtonText}>{'>'}</Text>
+                    </TouchableOpacity>
+                  </View>
+                  {/* Floating Scroll to Bottom Button */}
+                  <TouchableOpacity
+                    style={styles.scrollToBottomButton}
+                    onPress={() => {
+                      if (groupVerticalScrollRef.current) {
+                        groupVerticalScrollRef.current.scrollToEnd({ animated: true });
+                      }
+                    }}
+                  >
+                    <Text style={styles.scrollToBottomText}>↓</Text>
+                  </TouchableOpacity>
+                </Animatable.View>
+              )}
             </View>
           </TouchableWithoutFeedback>
         </ScrollView>
@@ -906,11 +1079,16 @@ const styles = StyleSheet.create({
   },
   deleteButton: {
     backgroundColor: '#ff6b6b',
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 15,
-    borderWidth: 2,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    borderRadius: 10,
+    borderWidth: 1.5,
     borderColor: '#ff4757',
+    minWidth: 0,
+    minHeight: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
   },
   deleteButtonText: {
     fontFamily: 'PressStart2P',
@@ -1074,17 +1252,14 @@ const styles = StyleSheet.create({
   timeContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    marginBottom: 15,
   },
   timeInput: {
     flex: 1,
   },
-  semesterContainer: {
-    marginBottom: 15,
-    zIndex: 3000,
-  },
-  dayContainer: {
-    marginBottom: 15,
-    zIndex: 2000,
+  timeRowContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   picker: {
     backgroundColor: '#f3c6f6',
@@ -1115,6 +1290,96 @@ const styles = StyleSheet.create({
     color: '#a259c6',
     textAlign: 'center',
     marginTop: 20,
+  },
+  groupScheduleContainer: {
+    marginTop: 20,
+    padding: 10,
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    shadowColor: '#b292ff',
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  groupHeaderRow: {
+    flexDirection: 'row',
+    borderBottomWidth: 2,
+    borderBottomColor: '#d1b3ff',
+    paddingBottom: 5,
+  },
+  timeSlotHeader: {
+    width: 80,
+    fontWeight: 'bold',
+    color: '#6e3abf',
+  },
+  userHeader: {
+    width: 120,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    color: '#6e3abf',
+  },
+  groupRow: {
+    flexDirection: 'row',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e9d6ff',
+  },
+  timeSlot: {
+    width: 80,
+    color: '#a259c6',
+  },
+  scheduleCell: {
+    width: 120,
+    textAlign: 'center',
+    color: '#7a58b8',
+  },
+  busyCell: {
+    fontWeight: 'bold',
+    color: '#ff6b6b',
+  },
+  deleteIcon: {
+    width: 16,
+    height: 16,
+    tintColor: '#ff6b6b',
+    marginLeft: 4,
+  },
+  scrollButton: {
+    backgroundColor: '#d1b3ff',
+    borderRadius: 20,
+    padding: 10,
+    marginHorizontal: 5,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 2,
+  },
+  scrollButtonText: {
+    fontSize: 18,
+    color: '#6e3abf',
+    fontWeight: 'bold',
+    fontFamily: 'PressStart2P',
+  },
+  scrollToBottomButton: {
+    position: 'absolute',
+    right: 16,
+    bottom: 16,
+    backgroundColor: '#a259c6',
+    borderRadius: 24,
+    width: 48,
+    height: 48,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 4,
+    shadowColor: '#6e3abf',
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+  },
+  scrollToBottomText: {
+    color: '#fff',
+    fontSize: 28,
+    fontWeight: 'bold',
+    fontFamily: 'PressStart2P',
+    textAlign: 'center',
+    marginTop: -2,
   },
 });
 
