@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -11,10 +11,11 @@ import { AuthProvider, useAuth } from './Components/AuthContext';
 import { TaskProvider } from './Components/TaskContext';
 import { ScheduleProvider } from './Components/ScheduleContext';
 import { BudgetProvider } from './Components/BudgetContext';
-import { TutorialProvider } from './Components/TutorialContext';
+import { TutorialProvider, useTutorial } from './Components/TutorialContext';
 import { TutorialOverlay } from './Components/TutorialOverlay';
 import LoginScreen from './Components/LoginScreen';
 import HomeScreen from './Components/HomeScreen';
+import TasksScreen from './Components/TasksScreen';
 import BudgetTracker from './Components/BudgetTracker';
 import SchedulePlanner from './Components/SchedulePlanner';
 import AvatarBuilder from './Components/AvatarBuilder';
@@ -40,9 +41,31 @@ const Tab = createBottomTabNavigator();
 
 function TabNavigator() {
   const { currentUser } = useAuth();
+  const { showTutorial, currentTab, currentStep } = useTutorial();
+  const navigationRef = useRef(null);
+
+  // Effect to change tab when tutorial step changes
+  useEffect(() => {
+    if (showTutorial && currentStep >= 2 && navigationRef.current && currentTab) {
+      console.log(`Tutorial navigating to tab: ${currentTab} for step ${currentStep}`);
+      // Use setTimeout to ensure navigation happens after render
+      setTimeout(() => {
+        navigationRef.current?.navigate(currentTab);
+      }, 100);
+    }
+  }, [showTutorial, currentStep, currentTab]);
+
+  console.log('TabNavigator render:', { 
+    showTutorial, 
+    currentTab, 
+    currentStep,
+    shouldNavigate: showTutorial && currentStep >= 2
+  });
 
   return (
     <Tab.Navigator
+      ref={navigationRef}
+      initialRouteName="Home"
       screenOptions={({ route }) => ({
         tabBarIcon: ({ focused, color, size }) => {
           let iconName;
@@ -132,6 +155,7 @@ function NavigationWrapper() {
           />
         )}
       </Stack.Navigator>
+      {currentUser && <TutorialOverlay />}
     </NavigationContainer>
   );
 }

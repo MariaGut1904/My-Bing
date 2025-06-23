@@ -118,12 +118,12 @@ const BudgetTracker = () => {
   };
 
   return (
-    <SafeAreaView style={styles.bg}>
-      <ImageBackground 
-        source={require('../assets/pastel-pixel-bg.jpg')} 
-        style={styles.bg} 
-        resizeMode="cover"
-      >
+    <ImageBackground 
+      source={require('../assets/pastel-pixel-bg.jpg')} 
+      style={styles.bg} 
+      resizeMode="cover"
+    >
+      <SafeAreaView style={styles.bg}>
         <ScrollView contentContainerStyle={styles.scrollContainer}>
           <Animatable.View animation="bounceIn" style={styles.header}>
             <Image 
@@ -310,8 +310,8 @@ const BudgetTracker = () => {
             </View>
           </View>
         </Modal>
-      </ImageBackground>
-    </SafeAreaView>
+      </SafeAreaView>
+    </ImageBackground>
   );
 };
 
@@ -469,7 +469,6 @@ const styles = StyleSheet.create({
   deleteIcon: {
     width: 20,
     height: 20,
-    tintColor: '#ff6b6b',
   },
   noExpensesText: {
     fontFamily: 'PressStart2P',

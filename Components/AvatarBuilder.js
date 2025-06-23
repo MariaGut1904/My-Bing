@@ -198,7 +198,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 20,
+    marginBottom: 50,
+    paddingTop: 30,
   },
   starIcon: {
     width: 30,
@@ -207,7 +208,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: 'PressStart2P',
-    fontSize: 18,
+    fontSize: 22,
     color: '#a259c6',
     textShadowColor: 'rgba(255,255,255,0.7)',
     textShadowOffset: { width: 1, height: 1 },

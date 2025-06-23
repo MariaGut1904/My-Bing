@@ -43,7 +43,8 @@ const HomeScreen = ({ navigation }) => {
     return schedule.filter(event => {
       // For recurring classes
       if (event.isRecurring && event.day === todayDay && event.creator === currentUser) {
-        return true;
+        // Also check if today is within the semester range for recurring events
+        return todayStr >= event.semesterStart && todayStr <= event.semesterEnd;
       }
       // For one-time events
       if (!event.isRecurring && event.date === todayStr && event.creator === currentUser) {
@@ -65,7 +66,8 @@ const HomeScreen = ({ navigation }) => {
       if (event.type !== 'class') return false;
       // For recurring classes
       if (event.isRecurring && event.day === todayDay && event.creator === currentUser) {
-        return true;
+        // Also check if today is within the semester range for recurring events
+        return todayStr >= event.semesterStart && todayStr <= event.semesterEnd;
       }
       // For one-time classes
       if (!event.isRecurring && event.date === todayStr && event.creator === currentUser) {
@@ -84,12 +86,12 @@ const HomeScreen = ({ navigation }) => {
   };
 
   return (
-    <SafeAreaView style={styles.bg}>
-      <ImageBackground 
-        source={require('../assets/pastel-pixel-bg.jpg')} 
-        style={styles.bg} 
-        resizeMode="cover"
-      >
+    <ImageBackground 
+      source={require('../assets/pastel-pixel-bg.jpg')} 
+      style={styles.bg} 
+      resizeMode="cover"
+    >
+      <SafeAreaView style={styles.bg}>
         <ScrollView contentContainerStyle={styles.scrollContainer}>
           <Animatable.View animation="bounceIn" style={styles.header}>
             <Image 
@@ -243,8 +245,8 @@ const HomeScreen = ({ navigation }) => {
             />
           </TouchableOpacity>
         </View>
-      </ImageBackground>
-    </SafeAreaView>
+      </SafeAreaView>
+    </ImageBackground>
   );
 };
 
@@ -486,7 +488,6 @@ const styles = StyleSheet.create({
   deleteIcon: {
     width: 20,
     height: 20,
-    tintColor: '#ff6b6b',
   },
   noTasksText: {
     fontFamily: 'PressStart2P',

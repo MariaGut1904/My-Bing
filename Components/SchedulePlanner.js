@@ -609,7 +609,7 @@ const SchedulePlanner = () => {
           <Image source={require('../assets/kawaii-star.gif')} style={styles.starIcon} />
           <Text style={styles.title}>✨ Schedule Planner ✨</Text>
           <TouchableOpacity 
-            style={styles.deleteButton}
+            style={styles.deleteAllButton}
             onPress={handleDeleteAll}
           >
             <Text style={styles.deleteButtonText}>Delete All</Text>
@@ -963,16 +963,16 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 10,
+    paddingVertical: 6,
     backgroundColor: '#fff0fa',
   },
   starIcon: {
-    width: 30,
-    height: 30,
-    marginRight: 8,
+    width: 25,
+    height: 25,
+    marginRight: 6,
   },
   title: {
-    fontSize: 24,
+    fontSize: 20,
     color: '#6e3abf',
     fontWeight: 'bold',
     fontFamily: 'Cochin',
@@ -1043,7 +1043,7 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     paddingVertical: 14,
     marginVertical: 20,
-    marginHorizontal: 50,
+    marginHorizontal: 20,
     shadowColor: '#6a3ba2',
     shadowOpacity: 0.4,
     shadowRadius: 8,
@@ -1094,21 +1094,29 @@ const styles = StyleSheet.create({
     borderColor: '#d1b3ff'
   },
   deleteButton: {
-    backgroundColor: '#ff6b6b',
+    backgroundColor: 'transparent',
     paddingHorizontal: 6,
     paddingVertical: 4,
     borderRadius: 10,
-    borderWidth: 1.5,
-    borderColor: '#ff4757',
     minWidth: 0,
     minHeight: 0,
     alignItems: 'center',
     justifyContent: 'center',
     alignSelf: 'center',
   },
+  deleteAllButton: {
+    backgroundColor: '#ff6b6b',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    borderColor: '#ff4757',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   deleteButtonText: {
     fontFamily: 'PressStart2P',
-    fontSize: 10,
+    fontSize: 9,
     color: '#fff',
   },
   toggleContainer: {
@@ -1240,10 +1248,12 @@ const styles = StyleSheet.create({
   },
   shareButton: {
     backgroundColor: '#6e3abf',
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 15,
+    paddingHorizontal: 6,
+    paddingVertical: 6,
+    borderRadius: 12,
     marginLeft: 10,
+    minWidth: 50,
+    alignItems: 'center',
   },
   shareButtonText: {
     fontFamily: 'PressStart2P',
@@ -1356,7 +1366,6 @@ const styles = StyleSheet.create({
   deleteIcon: {
     width: 16,
     height: 16,
-    tintColor: '#ff6b6b',
     marginLeft: 4,
   },
   scrollButton: {
