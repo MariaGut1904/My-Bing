@@ -34,6 +34,8 @@ LogBox.ignoreLogs([
   'Require cycle',
   'Possible Unhandled Promise Rejection',
   'VirtualizedLists should never be nested',
+  'Internal React error: Expected static flag was missing',
+  'React has detected a change in the order of Hooks',
 ]);
 
 const Stack = createStackNavigator();

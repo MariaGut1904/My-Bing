@@ -37,17 +37,7 @@ export const TutorialOverlay = () => {
   const { showTutorial, currentStep, currentTab, nextStep, skipTutorial, completeTutorial } = useTutorial();
   const navigation = useNavigation();
 
-  if (!showTutorial) {
-    console.log('Tutorial not showing because showTutorial is false');
-    return null;
-  }
-
-  console.log('Rendering tutorial overlay, current step:', currentStep, 'current tab:', currentTab);
-  const currentTutorialStep = tutorialSteps[currentStep];
-  const isLastStep = currentStep === tutorialSteps.length - 1;
-  const isIntroduction = currentTutorialStep.isIntroduction;
-
-  // Manual navigation effect for tab switching
+  // Manual navigation effect for tab switching - MUST be called before any conditional returns
   React.useEffect(() => {
     if (showTutorial && currentStep >= 2 && currentTab) {
       console.log(`TutorialOverlay: Manually navigating to ${currentTab}`);
@@ -61,6 +51,16 @@ export const TutorialOverlay = () => {
       }, 100);
     }
   }, [currentStep, currentTab, showTutorial, navigation]);
+
+  if (!showTutorial) {
+    console.log('Tutorial not showing because showTutorial is false');
+    return null;
+  }
+
+  console.log('Rendering tutorial overlay, current step:', currentStep, 'current tab:', currentTab);
+  const currentTutorialStep = tutorialSteps[currentStep];
+  const isLastStep = currentStep === tutorialSteps.length - 1;
+  const isIntroduction = currentTutorialStep.isIntroduction;
 
   const handleNext = () => {
     if (isLastStep) {
@@ -101,15 +101,6 @@ export const TutorialOverlay = () => {
   // Bottom corner layout with speech bubble for tab explanations
   return (
     <View style={styles.transparentContainer}>
-      {/* Tab indicator */}
-      {!isIntroduction && (
-        <View style={styles.tabIndicator}>
-          <Text style={styles.tabIndicatorText}>
-            Current Tab: {currentTab} (Step {currentStep + 1}/5)
-          </Text>
-        </View>
-      )}
-      
       <View style={styles.bottomCornerContainer}>
         <View style={styles.speechBubble}>
           <Text style={styles.sparkleLeft}>✨</Text>
@@ -290,22 +281,6 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: {
     color: '#fff',
-  },
-  tabIndicator: {
-    position: 'absolute',
-    top: 20,
-    left: 20,
-    right: 20,
-    zIndex: 10001,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    borderRadius: 10,
-    padding: 5,
-  },
-  tabIndicatorText: {
-    fontFamily: 'PressStart2P',
-    fontSize: 8,
-    color: '#fff',
-    textAlign: 'center',
   },
   sparkleLeft: {
     position: 'absolute',
