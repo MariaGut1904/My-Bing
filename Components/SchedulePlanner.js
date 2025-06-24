@@ -58,6 +58,11 @@ const SchedulePlanner = () => {
   const groupScrollRef = useRef();
   const groupVerticalScrollRef = useRef();
 
+  // For smooth vertical paging in compare view
+  const verticalScrollOffset = useRef(0);
+  const timeSlotHeight = 35; // Approximate height of each time slot row (matches minHeight in styles)
+  const slotsPerPage = 16; // 4 hours (16 x 15min)
+
   const getSemesterDates = (semester) => {
     const [term, year] = semester.split(' ');
     if (term === 'Fall') {
@@ -523,15 +528,17 @@ const SchedulePlanner = () => {
     setCurrentUser(authUser);
   }, [authUser]);
 
-  // Helper function to generate 15-minute time slots for the day view
+  // Helper function to generate 15-minute time slots for the day view (compare mode)
   const generateTimeSlots = () => {
     const slots = [];
     const startHour = 8;
-    const endHour = 23; // 11 PM
+    const endHour = 22; // 10 PM
     for (let hour = startHour; hour <= endHour; hour++) {
       for (let min = 0; min < 60; min += 15) {
         let displayHour = hour;
         let period = 'AM';
+        
+        // Convert to 12-hour format
         if (hour === 0) {
           displayHour = 12;
         } else if (hour === 12) {
@@ -540,6 +547,7 @@ const SchedulePlanner = () => {
           displayHour = hour - 12;
           period = 'PM';
         }
+        
         const minStr = min.toString().padStart(2, '0');
         slots.push(`${displayHour}:${minStr} ${period}`);
       }
@@ -556,9 +564,11 @@ const SchedulePlanner = () => {
     if (period === 'PM' && hour !== 12) hour += 12;
     if (period === 'AM' && hour === 12) hour = 0;
     const slotStart = hour * 60 + minute;
-    const slotEnd = slotStart + 15;
+    const slotEnd = slotStart + 15; // 15-minute slot
+
     const selectedDateObj = new Date(selectedDate + 'T00:00:00');
     const selectedDay = selectedDateObj.getDay();
+
     const event = allClassesFull.find(item => {
       if (item.creator !== user) return false;
       // Parse event start/end
@@ -566,8 +576,8 @@ const SchedulePlanner = () => {
       const [eventEndHour, eventEndMinute] = item.endTime.split(':').map(Number);
       const eventStart = eventStartHour * 60 + eventStartMinute;
       const eventEnd = eventEndHour * 60 + eventEndMinute;
-      // Mark busy if slot overlaps event, or if slotEnd === eventEnd (so the slot ending exactly at the event end is busy)
-      if ((slotStart < eventEnd && slotEnd > eventStart) || slotEnd === eventEnd) {
+      // Check if the 15-minute slot overlaps with the event
+      if (slotStart < eventEnd && slotEnd > eventStart) {
         if (item.isRecurring) {
           return item.day === selectedDay;
         }
@@ -894,28 +904,19 @@ const SchedulePlanner = () => {
               {isComparing && selectedDate && (
                 <Animatable.View animation="fadeInUp" delay={200} style={[styles.groupScheduleContainer, { position: 'relative' }]}> 
                   <Text style={styles.dailyTitle}>Group Schedule for {new Date(selectedDate).toLocaleDateString()}</Text>
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <TouchableOpacity
-                      style={styles.scrollButton}
-                      onPress={() => {
-                        if (groupScrollRef.current) {
-                          groupScrollRef.current.scrollTo({ x: 0, animated: true });
-                        }
-                      }}
-                    >
-                      <Text style={styles.scrollButtonText}>{'<'}</Text>
-                    </TouchableOpacity>
+                  <View style={styles.compareContainer}>
                     <ScrollView
                       horizontal
                       ref={groupScrollRef}
                       showsHorizontalScrollIndicator={false}
-                      style={{ flex: 1 }}
+                      style={styles.horizontalScroll}
                     >
                       <ScrollView
                         ref={groupVerticalScrollRef}
                         showsVerticalScrollIndicator={true}
+                        style={styles.verticalScroll}
                       >
-                        <View style={{ paddingBottom: 80 }}>
+                        <View style={styles.compareTable}>
                           <View style={styles.groupHeaderRow}>
                             <Text style={styles.timeSlotHeader}>Time</Text>
                             {users.map(user => <Text key={user} style={styles.userHeader}>{user}</Text>)}
@@ -933,28 +934,66 @@ const SchedulePlanner = () => {
                         </View>
                       </ScrollView>
                     </ScrollView>
-                    <TouchableOpacity
-                      style={styles.scrollButton}
-                      onPress={() => {
-                        if (groupScrollRef.current) {
-                          groupScrollRef.current.scrollTo({ x: 1000, animated: true });
-                        }
-                      }}
-                    >
-                      <Text style={styles.scrollButtonText}>{'>'}</Text>
-                    </TouchableOpacity>
                   </View>
-                  {/* Floating Scroll to Bottom Button */}
-                  <TouchableOpacity
-                    style={styles.scrollToBottomButton}
-                    onPress={() => {
-                      if (groupVerticalScrollRef.current) {
-                        groupVerticalScrollRef.current.scrollToEnd({ animated: true });
-                      }
-                    }}
-                  >
-                    <Text style={styles.scrollToBottomText}>↓</Text>
-                  </TouchableOpacity>
+                  
+                  {/* Navigation Control Panel */}
+                  <View style={styles.navigationPanel}>
+                    {/* Horizontal Navigation */}
+                    <View style={styles.horizontalNav}>
+                      <TouchableOpacity
+                        style={styles.navButton}
+                        onPress={() => {
+                          if (groupScrollRef.current) {
+                            groupScrollRef.current.scrollTo({ x: 0, animated: true });
+                          }
+                        }}
+                      >
+                        <Text style={styles.navButtonText}>◀</Text>
+                      </TouchableOpacity>
+                      <Text style={styles.navLabel}>Users</Text>
+                      <TouchableOpacity
+                        style={styles.navButton}
+                        onPress={() => {
+                          if (groupScrollRef.current) {
+                            groupScrollRef.current.scrollTo({ x: 1000, animated: true });
+                          }
+                        }}
+                      >
+                        <Text style={styles.navButtonText}>▶</Text>
+                      </TouchableOpacity>
+                    </View>
+                    
+                    {/* Vertical Navigation */}
+                    <View style={styles.verticalNav}>
+                      <TouchableOpacity
+                        style={styles.navButton}
+                        onPress={() => {
+                          if (groupVerticalScrollRef.current) {
+                            const newOffset = Math.max(0, verticalScrollOffset.current - timeSlotHeight * slotsPerPage);
+                            verticalScrollOffset.current = newOffset;
+                            groupVerticalScrollRef.current.scrollTo({ y: newOffset, animated: true });
+                          }
+                        }}
+                      >
+                        <Text style={styles.navButtonText}>▲</Text>
+                      </TouchableOpacity>
+                      <Text style={styles.navLabel}>Time</Text>
+                      <TouchableOpacity
+                        style={styles.navButton}
+                        onPress={() => {
+                          if (groupVerticalScrollRef.current) {
+                            const totalSlots = generateTimeSlots().length;
+                            const maxScroll = Math.max(0, (totalSlots - slotsPerPage) * timeSlotHeight);
+                            const newOffset = Math.min(maxScroll, verticalScrollOffset.current + timeSlotHeight * slotsPerPage);
+                            verticalScrollOffset.current = newOffset;
+                            groupVerticalScrollRef.current.scrollTo({ y: newOffset, animated: true });
+                          }
+                        }}
+                      >
+                        <Text style={styles.navButtonText}>▼</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
                 </Animatable.View>
               )}
             </View>
@@ -983,7 +1022,7 @@ const styles = StyleSheet.create({
   },
   scrollContainer: {
     paddingHorizontal: 16,
-    paddingBottom: 40,
+    paddingBottom:80,
     backgroundColor: 'transparent',
   },
   header: {
@@ -1355,49 +1394,69 @@ const styles = StyleSheet.create({
   },
   groupScheduleContainer: {
     marginTop: 20,
-    padding: 10,
+    padding: 15,
     backgroundColor: '#fff',
-    borderRadius: 10,
+    borderRadius: 15,
     shadowColor: '#b292ff',
     shadowOpacity: 0.2,
     shadowRadius: 6,
     elevation: 4,
+    height: Dimensions.get('window').height * 0.7,
+    marginBottom: 20,
   },
   groupHeaderRow: {
     flexDirection: 'row',
     borderBottomWidth: 2,
     borderBottomColor: '#d1b3ff',
-    paddingBottom: 5,
+    paddingBottom: 8,
+    paddingTop: 5,
+    backgroundColor: '#f8f0ff',
+    borderRadius: 8,
+    marginBottom: 5,
   },
   timeSlotHeader: {
-    width: 80,
+    width: 70,
     fontWeight: 'bold',
     color: '#6e3abf',
+    fontFamily: 'PressStart2P',
+    fontSize: 10,
   },
   userHeader: {
-    width: 120,
+    width: 140,
     fontWeight: 'bold',
     textAlign: 'center',
     color: '#6e3abf',
+    fontFamily: 'PressStart2P',
+    fontSize: 8,
   },
   groupRow: {
     flexDirection: 'row',
-    paddingVertical: 10,
+    paddingVertical: 8,
     borderBottomWidth: 1,
     borderBottomColor: '#e9d6ff',
+    minHeight: 35,
   },
   timeSlot: {
-    width: 80,
+    width: 70,
     color: '#a259c6',
+    fontFamily: 'PressStart2P',
+    fontSize: 8,
+    textAlign: 'center',
   },
   scheduleCell: {
-    width: 120,
+    width: 140,
     textAlign: 'center',
     color: '#7a58b8',
+    fontFamily: 'PressStart2P',
+    fontSize: 7,
+    paddingHorizontal: 2,
   },
   busyCell: {
     fontWeight: 'bold',
     color: '#ff6b6b',
+    backgroundColor: '#ffe6e6',
+    borderRadius: 4,
+    paddingVertical: 2,
   },
   deleteIcon: {
     width: 16,
@@ -1464,6 +1523,56 @@ const styles = StyleSheet.create({
   helpIcon: {
     width: 20,
     height: 20,
+  },
+  compareContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  horizontalScroll: {
+    flex: 1,
+  },
+  verticalScroll: {
+    flex: 1,
+  },
+  compareTable: {
+    paddingBottom: 20,
+  },
+  navigationPanel: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 10,
+    marginBottom: 20,
+    paddingHorizontal: 10,
+  },
+  horizontalNav: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  navButton: {
+    padding: 10,
+    marginHorizontal: 5,
+    borderRadius: 20,
+    backgroundColor: '#e9d6ff',
+    borderWidth: 2,
+    borderColor: '#d1b3ff',
+    minWidth: 40,
+  },
+  navButtonText: {
+    fontSize: 18,
+    color: '#6e3abf',
+    fontWeight: 'bold',
+    fontFamily: 'PressStart2P',
+  },
+  navLabel: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#6e3abf',
+    fontFamily: 'PressStart2P',
+  },
+  verticalNav: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
 });
 
