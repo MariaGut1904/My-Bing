@@ -16,7 +16,6 @@ export const TutorialProvider = ({ children }) => {
     'Home',    // Step 1: Home screen explanation
     'Schedule', // Step 2: Schedule tab explanation
     'Budget',  // Step 3: Budget tab explanation
-    'Avatar',  // Step 4: Avatar tab explanation
   ];
 
   useEffect(() => {

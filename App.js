@@ -18,7 +18,6 @@ import HomeScreen from './Components/HomeScreen';
 import TasksScreen from './Components/TasksScreen';
 import BudgetTracker from './Components/BudgetTracker';
 import SchedulePlanner from './Components/SchedulePlanner';
-import AvatarBuilder from './Components/AvatarBuilder';
 import LoadingScreen from './Components/LoadingScreen';
 
 // Enable screens for better performance
@@ -103,8 +102,6 @@ function TabNavigator() {
             iconName = focused ? 'wallet' : 'wallet-outline';
           } else if (route.name === 'Schedule') {
             iconName = focused ? 'calendar' : 'calendar-outline';
-          } else if (route.name === 'Avatar') {
-            iconName = focused ? 'person' : 'person-outline';
           }
 
           return <Ionicons name={iconName} size={size} color={color} />;
@@ -140,13 +137,6 @@ function TabNavigator() {
         component={SchedulePlanner}
         options={{
           title: 'Schedule',
-        }}
-      />
-      <Tab.Screen 
-        name="Avatar" 
-        component={AvatarBuilder}
-        options={{
-          title: 'Avatar',
         }}
       />
     </Tab.Navigator>

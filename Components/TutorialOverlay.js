@@ -26,11 +26,6 @@ const tutorialSteps = [
     text: 'College life means managing your budget! The Budget tab helps you track expenses for textbooks, food, and fun activities. Let\'s make smart financial choices together! 💰',
     isIntroduction: false,
   },
-  {
-    image: require('../assets/Maria.png'),
-    text: 'Last but not least, visit the Avatar tab to customize your character and settings. Make it uniquely you! I\'m so excited to be your guide this semester! Let\'s make it amazing! ✨',
-    isIntroduction: false,
-  },
 ];
 
 export const TutorialOverlay = () => {
