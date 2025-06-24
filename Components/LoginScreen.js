@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ImageBackground, Image, Alert } from 'react-native';
 import { useAuth } from './AuthContext';
-import { useTutorial } from './TutorialContext';
 import { useBudget } from './BudgetContext';
 import { nuclearDataCleanup } from '../utils/cleanData';
 import DropDownPicker from 'react-native-dropdown-picker';
@@ -12,7 +11,6 @@ const LoginScreen = ({ navigation }) => {
   const [error, setError] = useState('');
   const [open, setOpen] = useState(false);
   const { login } = useAuth();
-  const { resetTutorial } = useTutorial();
   const { resetBudget } = useBudget();
 
   const users = [
@@ -49,8 +47,6 @@ const LoginScreen = ({ navigation }) => {
 
       await login(username);
       console.log('Login successful, resetting tutorial...');
-      await resetTutorial();
-      console.log('Tutorial reset complete');
     } catch (error) {
       console.error('Login error:', error);
       setError(error.message);

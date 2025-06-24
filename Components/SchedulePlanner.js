@@ -6,6 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MonthCalendar } from '@quidone/react-native-calendars';
 import { useSchedule } from './ScheduleContext';
 import { useAuth } from './AuthContext';
+import { HelpOverlay } from './HelpOverlay';
 
 const { width, height } = Dimensions.get('window');
 
@@ -32,6 +33,7 @@ const SchedulePlanner = () => {
   const [allClassesFull, setAllClassesFull] = useState([]);
   const [isComparing, setIsComparing] = useState(false);
   const [users, setUsers] = useState(['Maria', 'Luna', 'Reni', 'Sheila']);
+  const [showHelp, setShowHelp] = useState(false);
 
   // States for new time dropdowns
   const [startTimeHour, setStartTimeHour] = useState(null);
@@ -618,12 +620,23 @@ const SchedulePlanner = () => {
         <Animatable.View animation="bounceIn" style={styles.header}>
           <Image source={require('../assets/kawaii-star.gif')} style={styles.starIcon} />
           <Text style={styles.title}>✨ Schedule Planner ✨</Text>
-          <TouchableOpacity 
-            style={styles.deleteAllButton}
-            onPress={handleDeleteAll}
-          >
-            <Text style={styles.deleteButtonText}>Delete All</Text>
-          </TouchableOpacity>
+          <View style={styles.headerButtons}>
+            <TouchableOpacity 
+              style={styles.helpButton}
+              onPress={() => setShowHelp(true)}
+            >
+              <Image 
+                source={require('../assets/help.png')} 
+                style={styles.helpIcon}
+              />
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.deleteAllButton}
+              onPress={handleDeleteAll}
+            >
+              <Text style={styles.deleteButtonText}>Delete All</Text>
+            </TouchableOpacity>
+          </View>
         </Animatable.View>
         <ScrollView contentContainerStyle={styles.scrollContainer}>
           <View style={styles.toggleContainer}>
@@ -948,6 +961,11 @@ const SchedulePlanner = () => {
           </TouchableWithoutFeedback>
         </ScrollView>
       </SafeAreaView>
+      <HelpOverlay 
+        visible={showHelp} 
+        tab="schedule" 
+        onClose={() => setShowHelp(false)} 
+      />
     </ImageBackground>
   );
 };
@@ -1434,6 +1452,18 @@ const styles = StyleSheet.create({
   },
   decorativeIcon: {
     position: 'absolute',
+  },
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  helpButton: {
+    padding: 10,
+    marginRight: 10,
+  },
+  helpIcon: {
+    width: 20,
+    height: 20,
   },
 });
 

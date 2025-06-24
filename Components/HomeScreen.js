@@ -5,7 +5,7 @@ import { useTasks } from './TaskContext';
 import { useSchedule } from './ScheduleContext';
 import { useBudget } from './BudgetContext';
 import { useAuth } from './AuthContext';
-import { useTutorial } from './TutorialContext';
+import { HelpOverlay } from './HelpOverlay';
 import * as Animatable from 'react-native-animatable';
 
 const HomeScreen = ({ navigation }) => {
@@ -13,9 +13,9 @@ const HomeScreen = ({ navigation }) => {
   const { tasks = [], addTask, deleteTask, resetTasks } = useTasks();
   const { schedule = [], resetSchedule } = useSchedule();
   const { budget = { food: [], money: [] }, resetBudget } = useBudget();
-  const { resetTutorial } = useTutorial();
   const [isTaskModalVisible, setIsTaskModalVisible] = useState(false);
   const [newTaskText, setNewTaskText] = useState('');
+  const [showHelp, setShowHelp] = useState(false);
 
   // Debug logging
   console.log('HomeScreen currentUser:', currentUser);
@@ -27,7 +27,6 @@ const HomeScreen = ({ navigation }) => {
       resetTasks();
       resetSchedule();
       resetBudget();
-      resetTutorial();
     } catch (error) {
       console.error('Logout error:', error);
     }
@@ -281,7 +280,7 @@ const HomeScreen = ({ navigation }) => {
               style={styles.logoutIcon}
             />
           </TouchableOpacity>
-          <TouchableOpacity onPress={resetTutorial} style={styles.tutorialButton}>
+          <TouchableOpacity onPress={() => setShowHelp(true)} style={styles.tutorialButton}>
             <Image 
               source={require('../assets/help.png')} 
               style={styles.tutorialIcon}
@@ -289,6 +288,11 @@ const HomeScreen = ({ navigation }) => {
           </TouchableOpacity>
         </View>
       </SafeAreaView>
+      <HelpOverlay 
+        visible={showHelp} 
+        tab="home" 
+        onClose={() => setShowHelp(false)} 
+      />
     </ImageBackground>
   );
 };

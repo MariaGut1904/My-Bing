@@ -8,6 +8,7 @@ import {
 import * as Animatable from 'react-native-animatable';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useBudget } from './BudgetContext';
+import { HelpOverlay } from './HelpOverlay';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AuthContext } from './AuthContext';
 
@@ -72,6 +73,7 @@ const BudgetTracker = () => {
   const [isLimitModalVisible, setIsLimitModalVisible] = useState(false);
   const [newExpense, setNewExpense] = useState({ amount: '', description: '' });
   const [newLimit, setNewLimit] = useState('');
+  const [showHelp, setShowHelp] = useState(false);
 
   const handleAddExpense = () => {
     if (newExpense.amount && newExpense.description) {
@@ -109,200 +111,216 @@ const BudgetTracker = () => {
   };
 
   return (
-    <ImageBackground 
-      source={require('../assets/pastel-pixel-bg.jpg')} 
-      style={styles.bg} 
-      resizeMode="cover"
-    >
-      <SafeAreaView style={styles.bg}>
-        <ScrollView contentContainerStyle={styles.scrollContainer}>
-          <Animatable.View animation="bounceIn" style={styles.header}>
-            <Image 
-              source={require('../assets/decor5.gif')} 
-              style={styles.headerIcon}
-            />
-            <Text style={styles.title}>✨ Budget Tracker ✨</Text>
-          </Animatable.View>
-
-          {/* Tab Navigation */}
-          <View style={styles.tabContainer}>
-            <TouchableOpacity
-              style={[styles.tab, activeTab === 'food' && styles.activeTab]}
-              onPress={() => setActiveTab('food')}
-            >
+    <View style={{ flex: 1 }}>
+      <ImageBackground 
+        source={require('../assets/pastel-pixel-bg.jpg')} 
+        style={styles.bg} 
+        resizeMode="cover"
+      >
+        <SafeAreaView style={styles.bg}>
+          <ScrollView contentContainerStyle={styles.scrollContainer}>
+            <Animatable.View animation="bounceIn" style={styles.header}>
               <Image 
-                source={require('../assets/food-icon.gif')} 
-                style={styles.tabIcon}
+                source={require('../assets/decor5.gif')} 
+                style={styles.headerIcon}
               />
-              <Text style={[styles.tabText, activeTab === 'food' && styles.activeTabText]}>
-                Food
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.tab, activeTab === 'money' && styles.activeTab]}
-              onPress={() => setActiveTab('money')}
-            >
-              <Image 
-                source={require('../assets/money-icon.gif')} 
-                style={styles.tabIcon}
-              />
-              <Text style={[styles.tabText, activeTab === 'money' && styles.activeTabText]}>
-                Money
-              </Text>
-            </TouchableOpacity>
-          </View>
+              <Text style={styles.title}>✨ Budget Tracker ✨</Text>
+              <TouchableOpacity 
+                style={styles.helpButton}
+                onPress={() => setShowHelp(true)}
+              >
+                <Image 
+                  source={require('../assets/help.png')} 
+                  style={styles.helpIcon}
+                />
+              </TouchableOpacity>
+            </Animatable.View>
 
-          {/* Budget Summary Card */}
-          <Animatable.View animation="fadeInUp" style={styles.summaryCard}>
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryTitle}>Budget Limit:</Text>
-              <Text style={styles.summaryAmount}>
-                {formatCurrency(budget.limits[activeTab] || 0)}
-              </Text>
+            {/* Tab Navigation */}
+            <View style={styles.tabContainer}>
+              <TouchableOpacity
+                style={[styles.tab, activeTab === 'food' && styles.activeTab]}
+                onPress={() => setActiveTab('food')}
+              >
+                <Image 
+                  source={require('../assets/food-icon.gif')} 
+                  style={styles.tabIcon}
+                />
+                <Text style={[styles.tabText, activeTab === 'food' && styles.activeTabText]}>
+                  Food
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.tab, activeTab === 'money' && styles.activeTab]}
+                onPress={() => setActiveTab('money')}
+              >
+                <Image 
+                  source={require('../assets/money-icon.gif')} 
+                  style={styles.tabIcon}
+                />
+                <Text style={[styles.tabText, activeTab === 'money' && styles.activeTabText]}>
+                  Money
+                </Text>
+              </TouchableOpacity>
             </View>
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryTitle}>Spent:</Text>
-              <Text style={styles.summaryAmount}>
-                {formatCurrency(getTotalExpenses(budget[activeTab]))}
-              </Text>
-            </View>
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryTitle}>Remaining:</Text>
-              <Text style={[
-                styles.summaryAmount,
-                { color: getRemainingBudget(activeTab) >= 0 ? '#4CAF50' : '#ff6b6b' }
-              ]}>
-                {formatCurrency(getRemainingBudget(activeTab))}
-              </Text>
-            </View>
-            <TouchableOpacity
-              style={styles.setLimitButton}
-              onPress={() => setIsLimitModalVisible(true)}
-            >
-              <Text style={styles.setLimitButtonText}>Set Budget Limit ✨</Text>
-            </TouchableOpacity>
-          </Animatable.View>
 
-          {/* Expense List */}
-          <Animatable.View animation="fadeInUp" delay={200} style={styles.expenseList}>
-            {budget[activeTab].length > 0 ? (
-              budget[activeTab].map((expense) => (
-                <View key={expense.id} style={styles.expenseItem}>
-                  <View style={styles.expenseInfo}>
-                    <Text style={styles.expenseDescription}>{expense.description}</Text>
-                    <Text style={styles.expenseDate}>
-                      {new Date(expense.date).toLocaleDateString()}
-                    </Text>
+            {/* Budget Summary Card */}
+            <Animatable.View animation="fadeInUp" style={styles.summaryCard}>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryTitle}>Budget Limit:</Text>
+                <Text style={styles.summaryAmount}>
+                  {formatCurrency(budget.limits[activeTab] || 0)}
+                </Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryTitle}>Spent:</Text>
+                <Text style={styles.summaryAmount}>
+                  {formatCurrency(getTotalExpenses(budget[activeTab]))}
+                </Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryTitle}>Remaining:</Text>
+                <Text style={[
+                  styles.summaryAmount,
+                  { color: getRemainingBudget(activeTab) >= 0 ? '#4CAF50' : '#ff6b6b' }
+                ]}>
+                  {formatCurrency(getRemainingBudget(activeTab))}
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.setLimitButton}
+                onPress={() => setIsLimitModalVisible(true)}
+              >
+                <Text style={styles.setLimitButtonText}>Set Budget Limit ✨</Text>
+              </TouchableOpacity>
+            </Animatable.View>
+
+            {/* Expense List */}
+            <Animatable.View animation="fadeInUp" delay={200} style={styles.expenseList}>
+              {budget[activeTab].length > 0 ? (
+                budget[activeTab].map((expense) => (
+                  <View key={expense.id} style={styles.expenseItem}>
+                    <View style={styles.expenseInfo}>
+                      <Text style={styles.expenseDescription}>{expense.description}</Text>
+                      <Text style={styles.expenseDate}>
+                        {new Date(expense.date).toLocaleDateString()}
+                      </Text>
+                    </View>
+                    <View style={styles.expenseAmountContainer}>
+                      <Text style={styles.expenseAmount}>
+                        {formatCurrency(expense.amount)}
+                      </Text>
+                      <TouchableOpacity
+                        onPress={() => deleteExpense(activeTab, expense.id)}
+                        style={styles.deleteButton}
+                      >
+                        <Image
+                          source={require('../assets/trash.png')}
+                          style={styles.deleteIcon}
+                        />
+                      </TouchableOpacity>
+                    </View>
                   </View>
-                  <View style={styles.expenseAmountContainer}>
-                    <Text style={styles.expenseAmount}>
-                      {formatCurrency(expense.amount)}
-                    </Text>
-                    <TouchableOpacity
-                      onPress={() => deleteExpense(activeTab, expense.id)}
-                      style={styles.deleteButton}
-                    >
-                      <Image
-                        source={require('../assets/trash.png')}
-                        style={styles.deleteIcon}
-                      />
-                    </TouchableOpacity>
-                  </View>
+                ))
+              ) : (
+                <Text style={styles.noExpensesText}>No expenses yet. Add one below! ✨</Text>
+              )}
+            </Animatable.View>
+
+            {/* Add Expense Button */}
+            <Animatable.View animation="fadeInUp" delay={400}>
+              <TouchableOpacity
+                style={styles.addButton}
+                onPress={() => setIsModalVisible(true)}
+              >
+                <Text style={styles.addButtonText}>Add Expense ✨</Text>
+              </TouchableOpacity>
+            </Animatable.View>
+          </ScrollView>
+
+          {/* Add Expense Modal */}
+          <Modal
+            visible={isModalVisible}
+            transparent={true}
+            animationType="slide"
+            onRequestClose={() => setIsModalVisible(false)}
+          >
+            <View style={styles.modalContainer}>
+              <View style={styles.modalContent}>
+                <Text style={styles.modalTitle}>Add New Expense ✨</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Amount"
+                  keyboardType="decimal-pad"
+                  value={newExpense.amount}
+                  onChangeText={(text) => setNewExpense({ ...newExpense, amount: text })}
+                />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Description"
+                  value={newExpense.description}
+                  onChangeText={(text) => setNewExpense({ ...newExpense, description: text })}
+                />
+                <View style={styles.modalButtons}>
+                  <TouchableOpacity
+                    style={[styles.modalButton, { backgroundColor: '#ffb6c1' }]}
+                    onPress={() => setIsModalVisible(false)}
+                  >
+                    <Text style={styles.modalButtonText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.modalButton, { backgroundColor: '#ff69b4' }]}
+                    onPress={handleAddExpense}
+                  >
+                    <Text style={styles.modalButtonText}>Add</Text>
+                  </TouchableOpacity>
                 </View>
-              ))
-            ) : (
-              <Text style={styles.noExpensesText}>No expenses yet. Add one below! ✨</Text>
-            )}
-          </Animatable.View>
-
-          {/* Add Expense Button */}
-          <Animatable.View animation="fadeInUp" delay={400}>
-            <TouchableOpacity
-              style={styles.addButton}
-              onPress={() => setIsModalVisible(true)}
-            >
-              <Text style={styles.addButtonText}>Add Expense ✨</Text>
-            </TouchableOpacity>
-          </Animatable.View>
-        </ScrollView>
-
-        {/* Add Expense Modal */}
-        <Modal
-          visible={isModalVisible}
-          transparent={true}
-          animationType="slide"
-          onRequestClose={() => setIsModalVisible(false)}
-        >
-          <View style={styles.modalContainer}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>Add New Expense ✨</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Amount"
-                keyboardType="decimal-pad"
-                value={newExpense.amount}
-                onChangeText={(text) => setNewExpense({ ...newExpense, amount: text })}
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="Description"
-                value={newExpense.description}
-                onChangeText={(text) => setNewExpense({ ...newExpense, description: text })}
-              />
-              <View style={styles.modalButtons}>
-                <TouchableOpacity
-                  style={[styles.modalButton, { backgroundColor: '#ffb6c1' }]}
-                  onPress={() => setIsModalVisible(false)}
-                >
-                  <Text style={styles.modalButtonText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.modalButton, { backgroundColor: '#ff69b4' }]}
-                  onPress={handleAddExpense}
-                >
-                  <Text style={styles.modalButtonText}>Add</Text>
-                </TouchableOpacity>
               </View>
             </View>
-          </View>
-        </Modal>
+          </Modal>
 
-        {/* Set Budget Limit Modal */}
-        <Modal
-          visible={isLimitModalVisible}
-          transparent={true}
-          animationType="slide"
-          onRequestClose={() => setIsLimitModalVisible(false)}
-        >
-          <View style={styles.modalContainer}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>Set Budget Limit ✨</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter budget limit"
-                keyboardType="decimal-pad"
-                value={newLimit}
-                onChangeText={setNewLimit}
-              />
-              <View style={styles.modalButtons}>
-                <TouchableOpacity
-                  style={[styles.modalButton, { backgroundColor: '#ffb6c1' }]}
-                  onPress={() => setIsLimitModalVisible(false)}
-                >
-                  <Text style={styles.modalButtonText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.modalButton, { backgroundColor: '#ff69b4' }]}
-                  onPress={handleSetLimit}
-                >
-                  <Text style={styles.modalButtonText}>Set Limit</Text>
-                </TouchableOpacity>
+          {/* Set Budget Limit Modal */}
+          <Modal
+            visible={isLimitModalVisible}
+            transparent={true}
+            animationType="slide"
+            onRequestClose={() => setIsLimitModalVisible(false)}
+          >
+            <View style={styles.modalContainer}>
+              <View style={styles.modalContent}>
+                <Text style={styles.modalTitle}>Set Budget Limit ✨</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter budget limit"
+                  keyboardType="decimal-pad"
+                  value={newLimit}
+                  onChangeText={setNewLimit}
+                />
+                <View style={styles.modalButtons}>
+                  <TouchableOpacity
+                    style={[styles.modalButton, { backgroundColor: '#ffb6c1' }]}
+                    onPress={() => setIsLimitModalVisible(false)}
+                  >
+                    <Text style={styles.modalButtonText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.modalButton, { backgroundColor: '#ff69b4' }]}
+                    onPress={handleSetLimit}
+                  >
+                    <Text style={styles.modalButtonText}>Set Limit</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             </View>
-          </View>
-        </Modal>
-      </SafeAreaView>
-    </ImageBackground>
+          </Modal>
+        </SafeAreaView>
+      </ImageBackground>
+      <HelpOverlay 
+        visible={showHelp} 
+        tab="budget" 
+        onClose={() => setShowHelp(false)} 
+      />
+    </View>
   );
 };
 
@@ -552,5 +570,12 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#fff',
     textAlign: 'center',
+  },
+  helpButton: {
+    padding: 5,
+  },
+  helpIcon: {
+    width: 20,
+    height: 20,
   },
 });
