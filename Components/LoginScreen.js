@@ -10,7 +10,7 @@ const LoginScreen = ({ navigation }) => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [open, setOpen] = useState(false);
-  const { login } = useAuth();
+  const { login, currentUser } = useAuth();
   const { resetBudget } = useBudget();
 
   const users = [
@@ -54,12 +54,36 @@ const LoginScreen = ({ navigation }) => {
   };
 
   const handleClearData = async () => {
-    try {
-      await nuclearDataCleanup();
-      Alert.alert('Success', 'All app data has been cleared!');
-    } catch (error) {
-      Alert.alert('Error', 'Failed to clear data: ' + error.message);
+    // Only Maria (administrator) can clear all data, and she must be logged in
+    if (currentUser !== 'Maria') {
+      Alert.alert(
+        'Access Denied', 
+        'Only Maria (administrator) can clear all data. Please log in as Maria first.',
+        [{ text: 'OK' }]
+      );
+      return;
     }
+
+    // Additional confirmation for Maria
+    Alert.alert(
+      'Confirm Clear All Data',
+      'Are you sure you want to clear ALL app data? This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Clear All Data',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await nuclearDataCleanup();
+              Alert.alert('Success', 'All app data has been cleared!');
+            } catch (error) {
+              Alert.alert('Error', 'Failed to clear data: ' + error.message);
+            }
+          }
+        }
+      ]
+    );
   };
 
   return (
@@ -103,10 +127,6 @@ const LoginScreen = ({ navigation }) => {
         
         <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
           <Text style={styles.buttonText}>Login ✨</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.clearButton} onPress={handleClearData}>
-          <Text style={styles.clearButtonText}>Clear All Data</Text>
         </TouchableOpacity>
       </View>
     </ImageBackground>
@@ -198,15 +218,6 @@ const styles = StyleSheet.create({
     fontFamily: 'PressStart2P',
     fontSize: 8,
     textAlign: 'center',
-  },
-  clearButton: {
-    marginTop: 20,
-    padding: 10,
-  },
-  clearButtonText: {
-    fontFamily: 'PressStart2P',
-    fontSize: 8,
-    color: '#ff6b6b',
   },
 });
 

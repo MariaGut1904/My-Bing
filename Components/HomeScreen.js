@@ -7,6 +7,7 @@ import { useBudget } from './BudgetContext';
 import { useAuth } from './AuthContext';
 import { HelpOverlay } from './HelpOverlay';
 import * as Animatable from 'react-native-animatable';
+import { nuclearDataCleanup } from '../utils/cleanData';
 
 const HomeScreen = ({ navigation }) => {
   const { currentUser, logout } = useAuth();
@@ -88,6 +89,37 @@ const HomeScreen = ({ navigation }) => {
       setNewTaskText('');
       setIsTaskModalVisible(false);
     }
+  };
+
+  // Add clear all data handler for Maria
+  const handleClearData = async () => {
+    if (currentUser !== 'Maria') {
+      Alert.alert(
+        'Access Denied',
+        'Only Maria (administrator) can clear all data.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+    Alert.alert(
+      'Confirm Clear All Data',
+      'Are you sure you want to clear ALL app data? This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Clear All Data',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await nuclearDataCleanup();
+              Alert.alert('Success', 'All app data has been cleared!');
+            } catch (error) {
+              Alert.alert('Error', 'Failed to clear data: ' + error.message);
+            }
+          }
+        }
+      ]
+    );
   };
 
   return (
@@ -286,6 +318,15 @@ const HomeScreen = ({ navigation }) => {
               style={styles.tutorialIcon}
             />
           </TouchableOpacity>
+          {/* Only show Clear All Data button for Maria */}
+          {currentUser === 'Maria' && (
+            <TouchableOpacity onPress={handleClearData} style={styles.clearDataButton}>
+              <Image 
+                source={require('../assets/trash-can.png')} 
+                style={styles.tutorialIcon}
+              />
+            </TouchableOpacity>
+          )}
         </View>
       </SafeAreaView>
       <HelpOverlay 
@@ -579,6 +620,16 @@ const styles = StyleSheet.create({
   tutorialIcon: {
     width: 30,
     height: 30,
+  },
+  clearDataButton: {
+    marginLeft: 10,
+    backgroundColor: 'rgba(255,255,255,0.7)',
+    borderRadius: 20,
+    padding: 6,
+    borderWidth: 2,
+    borderColor: '#ff6b6b',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
 

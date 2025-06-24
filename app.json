@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "MyAwesomeApp",
+    "name": "My Bing!",
     "slug": "MyAwesomeApp",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -34,6 +34,17 @@
     "plugins": [
       "expo-font"
     ],
-    "sdkVersion": "53.0.0"
+    "sdkVersion": "53.0.0",
+    "extra": {
+      "eas": {
+        "projectId": "e0503142-8770-4848-9937-44611f9e66c9"
+      }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/e0503142-8770-4848-9937-44611f9e66c9"
+    }
   }
 }
