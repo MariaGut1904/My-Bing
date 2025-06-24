@@ -154,10 +154,10 @@ function TabNavigator() {
 }
 
 function NavigationWrapper() {
-  const { currentUser, loading } = useAuth();
+  const { currentUser, isLoading } = useAuth();
 
-  if (loading) {
-    return null;
+  if (isLoading) {
+    return <LoadingScreen />;
   }
 
   return (

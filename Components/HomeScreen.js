@@ -17,6 +17,9 @@ const HomeScreen = ({ navigation }) => {
   const [isTaskModalVisible, setIsTaskModalVisible] = useState(false);
   const [newTaskText, setNewTaskText] = useState('');
 
+  // Debug logging
+  console.log('HomeScreen currentUser:', currentUser);
+
   const handleLogout = async () => {
     try {
       await logout();
@@ -103,11 +106,27 @@ const HomeScreen = ({ navigation }) => {
         
         <ScrollView contentContainerStyle={styles.scrollContainer}>
           <Animatable.View animation="bounceIn" style={styles.header}>
-            <Image 
-              source={require('../assets/Maria.png')} 
-              style={styles.avatar}
-            />
-            <Text style={styles.welcomeText}>Welcome back, {currentUser}</Text>
+            <Animatable.View 
+              animation="pulse" 
+              iterationCount="infinite" 
+              duration={2000}
+              style={styles.avatarContainer}
+            >
+              <Image 
+                source={
+                  currentUser === 'Reni' 
+                    ? require('../assets/reni.png') 
+                    : currentUser === 'Luna'
+                    ? require('../assets/luna.png')
+                    : currentUser === 'Sheila'
+                    ? require('../assets/sheila.png')
+                    : require('../assets/Maria.png')
+                } 
+                style={styles.avatar}
+                resizeMode="contain"
+              />
+            </Animatable.View>
+            <Text style={styles.welcomeText}>Welcome back, {currentUser || 'User'}</Text>
             <Text style={styles.dateText}>{getTodayDate()}</Text>
           </Animatable.View>
 
@@ -242,7 +261,16 @@ const HomeScreen = ({ navigation }) => {
 
           {/* Motivational Quote */}
           <Animatable.View animation="fadeInUp" delay={600} style={styles.quoteCard}>
-            <Text style={styles.quoteText}>"You're doing amazing, sweetie! 💖"</Text>
+            <Text style={styles.quoteText}>
+              {currentUser === 'Reni' 
+                ? '"You\'re absolutely incredible, Reni! Keep shining! ✨"'
+                : currentUser === 'Luna'
+                ? '"You\'re a star, Luna! Your light brightens every day! 🌟"'
+                : currentUser === 'Sheila'
+                ? '"You\'re amazing, Sheila! Your strength inspires us all! 💪"'
+                : '"You\'re doing amazing, sweetie! 💖"'
+              }
+            </Text>
             <Image source={require('../assets/pixel-heart.gif')} style={styles.quoteIcon} />
           </Animatable.View>
         </ScrollView>
@@ -277,10 +305,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 25,
   },
-  avatar: {
-    width: 100,
-    height: 100,
+  avatarContainer: {
     marginBottom: 15,
+  },
+  avatar: {
+    width: 120,
+    height: 150,
+    resizeMode: 'contain',
   },
   welcomeText: {
     fontFamily: 'PressStart2P',

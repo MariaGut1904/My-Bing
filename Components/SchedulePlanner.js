@@ -56,47 +56,64 @@ const SchedulePlanner = () => {
   const groupScrollRef = useRef();
   const groupVerticalScrollRef = useRef();
 
+  const getSemesterDates = (semester) => {
+    const [term, year] = semester.split(' ');
+    if (term === 'Fall') {
+      return {
+        start: new Date(parseInt(year), 7, 1), // August 1st
+        end: new Date(parseInt(year), 11, 31)  // December 31st
+      };
+    } else {
+      return {
+        start: new Date(parseInt(year), 0, 1),  // January 1st
+        end: new Date(parseInt(year), 4, 31)    // May 31st
+      };
+    }
+  };
+
+  // Load classes function - moved outside useEffect so it can be called from multiple places
+  const loadClasses = async () => {
+    try {
+      const savedClasses = await AsyncStorage.getItem('allClasses');
+      let fullList = savedClasses ? JSON.parse(savedClasses) : [];
+      setAllClassesFull(fullList);
+      // Only filter for display
+      const relevantClasses = fullList.filter(cls => cls.creator === currentUser || cls.isShared);
+      setAllClasses(relevantClasses);
+      setScheduleData(relevantClasses);
+      // Update marked dates for all loaded classes
+      const newMarkedDates = {};
+      relevantClasses.forEach(item => {
+        if (item.isRecurring) {
+          const semesterDates = getSemesterDates(item.semester);
+          let currentDate = new Date(semesterDates.start);
+          while (currentDate <= semesterDates.end) {
+            if (currentDate.getDay() === item.day) {
+              const dateStr = currentDate.toISOString().split('T')[0];
+              newMarkedDates[dateStr] = { 
+                marked: true, 
+                dotColor: item.semester === semester ? '#a259c6' : '#d1b3ff',
+                selected: item.semester === semester
+              };
+            }
+            currentDate.setDate(currentDate.getDate() + 1);
+          }
+        } else {
+          newMarkedDates[item.date] = { 
+            marked: true, 
+            dotColor: item.semester === semester ? '#a259c6' : '#d1b3ff',
+            selected: item.semester === semester
+          };
+        }
+      });
+      setMarkedDates(newMarkedDates);
+    } catch (error) {
+      console.error('Error loading classes:', error);
+    }
+  };
+
   // Load classes when component mounts or user/semester changes
   useEffect(() => {
-    const loadClasses = async () => {
-      try {
-        const savedClasses = await AsyncStorage.getItem('allClasses');
-        let fullList = savedClasses ? JSON.parse(savedClasses) : [];
-        setAllClassesFull(fullList);
-        // Only filter for display
-        const relevantClasses = fullList.filter(cls => cls.creator === currentUser || cls.isShared);
-        setAllClasses(relevantClasses);
-        setScheduleData(relevantClasses);
-        // Update marked dates for all loaded classes
-        const newMarkedDates = {};
-        relevantClasses.forEach(item => {
-          if (item.isRecurring) {
-            const semesterDates = getSemesterDates(item.semester);
-            let currentDate = new Date(semesterDates.start);
-            while (currentDate <= semesterDates.end) {
-              if (currentDate.getDay() === item.day) {
-                const dateStr = currentDate.toISOString().split('T')[0];
-                newMarkedDates[dateStr] = { 
-                  marked: true, 
-                  dotColor: item.semester === semester ? '#a259c6' : '#d1b3ff',
-                  selected: item.semester === semester
-                };
-              }
-              currentDate.setDate(currentDate.getDate() + 1);
-            }
-          } else {
-            newMarkedDates[item.date] = { 
-              marked: true, 
-              dotColor: item.semester === semester ? '#a259c6' : '#d1b3ff',
-              selected: item.semester === semester
-            };
-          }
-        });
-        setMarkedDates(newMarkedDates);
-      } catch (error) {
-        console.error('Error loading classes:', error);
-      }
-    };
     loadClasses();
   }, [currentUser, semester]);
 
@@ -178,21 +195,6 @@ const SchedulePlanner = () => {
     { label: 'Friday', value: 5 },
     { label: 'Saturday', value: 6 }
   ];
-
-  const getSemesterDates = (semester) => {
-    const [term, year] = semester.split(' ');
-    if (term === 'Fall') {
-      return {
-        start: new Date(parseInt(year), 7, 1), // August 1st
-        end: new Date(parseInt(year), 11, 31)  // December 31st
-      };
-    } else {
-      return {
-        start: new Date(parseInt(year), 0, 1),  // January 1st
-        end: new Date(parseInt(year), 4, 31)    // May 31st
-      };
-    }
-  };
 
   const handleAddClass = async () => {
     Keyboard.dismiss();
