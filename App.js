@@ -46,12 +46,36 @@ function TabNavigator() {
 
   // Effect to change tab when tutorial step changes
   useEffect(() => {
-    if (showTutorial && currentStep >= 2 && navigationRef.current && currentTab) {
+    if (showTutorial && currentStep >= 2 && currentTab) {
       console.log(`Tutorial navigating to tab: ${currentTab} for step ${currentStep}`);
-      // Use setTimeout to ensure navigation happens after render
-      setTimeout(() => {
-        navigationRef.current?.navigate(currentTab);
-      }, 100);
+      
+      // Use a more reliable navigation approach
+      const navigateToTab = () => {
+        if (navigationRef.current) {
+          try {
+            navigationRef.current.navigate(currentTab);
+            console.log(`Successfully navigated to ${currentTab}`);
+          } catch (error) {
+            console.log('Navigation failed:', error);
+          }
+        } else {
+          console.log('Navigation ref not available, trying again...');
+          // Retry after a short delay
+          setTimeout(() => {
+            if (navigationRef.current) {
+              try {
+                navigationRef.current.navigate(currentTab);
+                console.log(`Successfully navigated to ${currentTab} on retry`);
+              } catch (error) {
+                console.log('Navigation retry failed:', error);
+              }
+            }
+          }, 300);
+        }
+      };
+
+      // Try immediate navigation
+      navigateToTab();
     }
   }, [showTutorial, currentStep, currentTab]);
 
@@ -59,7 +83,8 @@ function TabNavigator() {
     showTutorial, 
     currentTab, 
     currentStep,
-    shouldNavigate: showTutorial && currentStep >= 2
+    shouldNavigate: showTutorial && currentStep >= 2,
+    navigationRef: !!navigationRef.current
   });
 
   return (
@@ -161,6 +186,31 @@ function NavigationWrapper() {
 }
 
 export default function App() {
+  const [fontsLoaded, setFontsLoaded] = useState(false);
+
+  useEffect(() => {
+    async function loadFonts() {
+      try {
+        await Font.loadAsync({
+          'PressStart2P': require('./assets/fonts/PressStart2P-Regular.ttf'),
+        });
+        setFontsLoaded(true);
+      } catch (error) {
+        console.log('Error loading fonts:', error);
+        setFontsLoaded(true); // Continue without custom font
+      }
+    }
+    loadFonts();
+  }, []);
+
+  if (!fontsLoaded) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color="#ff69b4" />
+      </View>
+    );
+  }
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <StatusBar style="auto" />

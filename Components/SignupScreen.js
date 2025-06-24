@@ -46,7 +46,20 @@ export default function SignupScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, justifyContent: 'center', padding: 20 },
-  input: { borderWidth: 1, marginBottom: 10, padding: 8, borderRadius: 4 },
-  title: { fontSize: 24, marginBottom: 20, textAlign: 'center' },
+  input: { 
+    borderWidth: 1, 
+    marginBottom: 10, 
+    padding: 8, 
+    borderRadius: 4,
+    fontFamily: 'PressStart2P',
+    fontSize: 8
+  },
+  title: { 
+    fontSize: 14, 
+    marginBottom: 20, 
+    textAlign: 'center',
+    fontFamily: 'PressStart2P',
+    color: '#6e3abf'
+  },
 }); 
  

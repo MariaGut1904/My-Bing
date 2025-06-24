@@ -5,6 +5,7 @@ import { useTasks } from './TaskContext';
 import { useSchedule } from './ScheduleContext';
 import { useBudget } from './BudgetContext';
 import { useAuth } from './AuthContext';
+import { useTutorial } from './TutorialContext';
 import * as Animatable from 'react-native-animatable';
 
 const HomeScreen = ({ navigation }) => {
@@ -12,6 +13,7 @@ const HomeScreen = ({ navigation }) => {
   const { tasks = [], addTask, deleteTask, resetTasks } = useTasks();
   const { schedule = [], resetSchedule } = useSchedule();
   const { budget = { food: [], money: [] }, resetBudget } = useBudget();
+  const { resetTutorial } = useTutorial();
   const [isTaskModalVisible, setIsTaskModalVisible] = useState(false);
   const [newTaskText, setNewTaskText] = useState('');
 
@@ -22,6 +24,7 @@ const HomeScreen = ({ navigation }) => {
       resetTasks();
       resetSchedule();
       resetBudget();
+      resetTutorial();
     } catch (error) {
       console.error('Logout error:', error);
     }
@@ -92,6 +95,12 @@ const HomeScreen = ({ navigation }) => {
       resizeMode="cover"
     >
       <SafeAreaView style={styles.bg}>
+        {/* Decorative Elements */}
+        <View style={styles.decorativeContainer}>
+          <Image source={require('../assets/decor8.gif')} style={[styles.decorativeIcon, { top: 20, left: 10, width: 25, height: 25 }]} />
+         
+        </View>
+        
         <ScrollView contentContainerStyle={styles.scrollContainer}>
           <Animatable.View animation="bounceIn" style={styles.header}>
             <Image 
@@ -244,6 +253,12 @@ const HomeScreen = ({ navigation }) => {
               style={styles.logoutIcon}
             />
           </TouchableOpacity>
+          <TouchableOpacity onPress={resetTutorial} style={styles.tutorialButton}>
+            <Image 
+              source={require('../assets/help.png')} 
+              style={styles.tutorialIcon}
+            />
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
     </ImageBackground>
@@ -269,7 +284,7 @@ const styles = StyleSheet.create({
   },
   welcomeText: {
     fontFamily: 'PressStart2P',
-    fontSize: 14,
+    fontSize: 10,
     color: '#a259c6',
     textAlign: 'center',
   },
@@ -283,7 +298,7 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     fontFamily: 'PressStart2P',
-    fontSize: 16,
+    fontSize: 12,
     color: '#ff69b4',
     marginBottom: 15,
   },
@@ -301,12 +316,12 @@ const styles = StyleSheet.create({
   },
   statValue: {
     fontFamily: 'PressStart2P',
-    fontSize: 12,
+    fontSize: 8,
     color: '#6e3abf',
   },
   statLabel: {
     fontFamily: 'PressStart2P',
-    fontSize: 8,
+    fontSize: 6,
     color: '#d291bc',
   },
   eventItem: {
@@ -325,19 +340,19 @@ const styles = StyleSheet.create({
   },
   eventTitle: {
     fontFamily: 'PressStart2P',
-    fontSize: 12,
+    fontSize: 8,
     color: '#ff69b4',
     marginBottom: 5,
   },
   creatorText: {
     fontFamily: 'PressStart2P',
-    fontSize: 10,
+    fontSize: 6,
     color: '#ffb6c1',
     fontStyle: 'italic',
   },
   eventTime: {
     fontFamily: 'PressStart2P',
-    fontSize: 10,
+    fontSize: 6,
     color: '#ffb6c1',
   },
   eventIcon: {
@@ -363,7 +378,7 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     fontFamily: 'PressStart2P',
-    fontSize: 8,
+    fontSize: 6,
     color: '#fff',
   },
   quoteCard: {
@@ -378,7 +393,7 @@ const styles = StyleSheet.create({
   },
   quoteText: {
     fontFamily: 'PressStart2P',
-    fontSize: 10,
+    fontSize: 8,
     color: '#6e3abf',
     flex: 1,
   },
@@ -412,7 +427,7 @@ const styles = StyleSheet.create({
   },
   noEventsText: {
     fontFamily: 'PressStart2P',
-    fontSize: 10,
+    fontSize: 8,
     color: '#ff69b4',
     textAlign: 'center',
     marginTop: 10,
@@ -433,7 +448,7 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     fontFamily: 'PressStart2P',
-    fontSize: 12,
+    fontSize: 10,
     color: '#a259c6',
     marginBottom: 15,
     textAlign: 'center',
@@ -459,7 +474,7 @@ const styles = StyleSheet.create({
   },
   modalButtonText: {
     fontFamily: 'PressStart2P',
-    fontSize: 10,
+    fontSize: 8,
     color: 'white',
   },
   taskItem: {
@@ -479,7 +494,7 @@ const styles = StyleSheet.create({
   },
   taskText: {
     fontFamily: 'PressStart2P',
-    fontSize: 12,
+    fontSize: 8,
     color: '#ff69b4',
   },
   deleteButton: {
@@ -491,17 +506,44 @@ const styles = StyleSheet.create({
   },
   noTasksText: {
     fontFamily: 'PressStart2P',
-    fontSize: 10,
+    fontSize: 8,
     color: '#ff69b4',
     textAlign: 'center',
     marginTop: 10,
   },
   dateText: {
     fontFamily: 'PressStart2P',
-    fontSize: 12,
+    fontSize: 8,
     color: '#ff69b4',
     marginTop: 5,
     textAlign: 'center',
+  },
+  decorativeContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: -1,
+  },
+  decorativeIcon: {
+    position: 'absolute',
+  },
+  tutorialButton: {
+    backgroundColor: 'rgba(255, 240, 250, 0.8)',
+    borderRadius: 30,
+    padding: 10,
+    borderWidth: 2,
+    borderColor: '#d1b3ff',
+    shadowColor: '#a259c6',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  tutorialIcon: {
+    width: 30,
+    height: 30,
   },
 });
 

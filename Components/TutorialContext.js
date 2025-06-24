@@ -108,8 +108,16 @@ export const TutorialProvider = ({ children }) => {
   };
 
   const nextStep = () => {
-    console.log('Moving to next step:', currentStep + 1);
-    setCurrentStep(prev => prev + 1);
+    const nextStepNumber = currentStep + 1;
+    console.log('Moving to next step:', nextStepNumber);
+    setCurrentStep(nextStepNumber);
+    
+    // Immediately update tab for the next step
+    if (nextStepNumber >= 2 && nextStepNumber < tutorialTabs.length) {
+      const nextTab = tutorialTabs[nextStepNumber];
+      console.log(`Immediately setting next tab: ${nextTab} for step ${nextStepNumber}`);
+      setCurrentTab(nextTab);
+    }
   };
 
   const skipTutorial = () => {

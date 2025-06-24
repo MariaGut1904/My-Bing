@@ -134,7 +134,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: 'PressStart2P',
-    fontSize: 24,
+    fontSize: 14,
     color: '#ff69b4',
     marginBottom: 30,
     textAlign: 'center',
@@ -153,7 +153,7 @@ const styles = StyleSheet.create({
     borderColor: '#ffb6c1',
     borderRadius: 10,
     fontFamily: 'PressStart2P',
-    fontSize: 12,
+    fontSize: 8,
   },
   dropdownList: {
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
@@ -163,7 +163,7 @@ const styles = StyleSheet.create({
   },
   dropdownText: {
     fontFamily: 'PressStart2P',
-    fontSize: 12,
+    fontSize: 8,
     color: '#ff69b4',
   },
   input: {
@@ -175,7 +175,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#ffb6c1',
     fontFamily: 'PressStart2P',
-    fontSize: 12,
+    fontSize: 8,
   },
   loginButton: {
     backgroundColor: '#ffb6c1',
@@ -193,14 +193,14 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     fontFamily: 'PressStart2P',
-    fontSize: 16,
+    fontSize: 10,
     color: '#fff',
   },
   errorText: {
     color: '#ff6b6b',
     marginBottom: 10,
     fontFamily: 'PressStart2P',
-    fontSize: 10,
+    fontSize: 8,
     textAlign: 'center',
   },
   clearButton: {
@@ -209,7 +209,7 @@ const styles = StyleSheet.create({
   },
   clearButtonText: {
     fontFamily: 'PressStart2P',
-    fontSize: 10,
+    fontSize: 8,
     color: '#ff6b6b',
   },
 });

@@ -39,7 +39,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: 'PressStart2P',
-    fontSize: 24,
+    fontSize: 14,
     color: '#a259c6',
     marginBottom: 20,
     textAlign: 'center',
@@ -59,7 +59,7 @@ const styles = StyleSheet.create({
   },
   taskText: {
     fontFamily: 'PressStart2P',
-    fontSize: 12,
+    fontSize: 8,
     color: '#a259c6',
     flex: 1,
   },
@@ -68,7 +68,7 @@ const styles = StyleSheet.create({
   },
   deleteButtonText: {
     fontFamily: 'PressStart2P',
-    fontSize: 16,
+    fontSize: 10,
     color: '#d291bc',
   },
   addButton: {
@@ -80,7 +80,7 @@ const styles = StyleSheet.create({
   },
   addButtonText: {
     fontFamily: 'PressStart2P',
-    fontSize: 12,
+    fontSize: 8,
     color: '#fff',
   },
 }); 

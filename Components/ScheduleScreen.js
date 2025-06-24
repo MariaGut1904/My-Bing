@@ -49,7 +49,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: 'PressStart2P',
-    fontSize: 24,
+    fontSize: 14,
     color: '#a259c6',
     marginBottom: 20,
     textAlign: 'center',
@@ -76,7 +76,7 @@ const styles = StyleSheet.create({
   },
   timeText: {
     fontFamily: 'PressStart2P',
-    fontSize: 10,
+    fontSize: 8,
     color: '#a259c6',
   },
   eventDetails: {
@@ -85,13 +85,13 @@ const styles = StyleSheet.create({
   },
   eventTitle: {
     fontFamily: 'PressStart2P',
-    fontSize: 12,
+    fontSize: 8,
     color: '#a259c6',
     marginBottom: 5,
   },
   eventLocation: {
     fontFamily: 'PressStart2P',
-    fontSize: 8,
+    fontSize: 6,
     color: '#d291bc',
   },
   deleteButton: {
@@ -99,7 +99,7 @@ const styles = StyleSheet.create({
   },
   deleteButtonText: {
     fontFamily: 'PressStart2P',
-    fontSize: 16,
+    fontSize: 10,
     color: '#d291bc',
   },
   addButton: {
@@ -111,7 +111,7 @@ const styles = StyleSheet.create({
   },
   addButtonText: {
     fontFamily: 'PressStart2P',
-    fontSize: 12,
+    fontSize: 8,
     color: '#fff',
   },
 }); 

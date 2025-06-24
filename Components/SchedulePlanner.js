@@ -605,6 +605,14 @@ const SchedulePlanner = () => {
   return (
     <ImageBackground source={require('../assets/pixel-bg.png')} style={styles.bg}>
       <SafeAreaView style={{ flex: 1 }}>
+        {/* Decorative Elements */}
+        <View style={styles.decorativeContainer}>
+          
+          <Image source={require('../assets/decor2.gif')} style={[styles.decorativeIcon, { top: 50, right: 10, width: 25, height: 25 }]} />
+          <Image source={require('../assets/decor3.gif')} style={[styles.decorativeIcon, { bottom: 100, left: 15, width: 25, height: 25 }]} />
+          <Image source={require('../assets/decor4.gif')} style={[styles.decorativeIcon, { bottom: 130, right: 15, width: 25, height: 25 }]} />
+        </View>
+        
         <Animatable.View animation="bounceIn" style={styles.header}>
           <Image source={require('../assets/kawaii-star.gif')} style={styles.starIcon} />
           <Text style={styles.title}>✨ Schedule Planner ✨</Text>
@@ -972,13 +980,13 @@ const styles = StyleSheet.create({
     marginRight: 6,
   },
   title: {
-    fontSize: 20,
+    fontSize: 12,
     color: '#6e3abf',
     fontWeight: 'bold',
-    fontFamily: 'Cochin',
+    fontFamily: 'PressStart2P',
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: 12,
     fontWeight: '600',
     color: '#7d57c3',
     marginBottom: 12,
@@ -1000,6 +1008,8 @@ const styles = StyleSheet.create({
     color: 'white',
     fontWeight: 'bold',
     textAlign: 'center',
+    fontFamily: 'PressStart2P',
+    fontSize: 8,
   },
   dropdownContainer: {
     height: 50,
@@ -1020,7 +1030,8 @@ const styles = StyleSheet.create({
   dropdownText: {
     color: '#a259c6',
     fontWeight: 'bold',
-    fontSize: 16,
+    fontSize: 8,
+    fontFamily: 'PressStart2P',
   },
   input: {
     backgroundColor: 'white',
@@ -1029,7 +1040,7 @@ const styles = StyleSheet.create({
     borderColor: '#d1b3ff',
     paddingHorizontal: 15,
     paddingVertical: 12,
-    fontSize: 16,
+    fontSize: 8,
     color: '#5c3c9d',
     marginBottom: 15,
     shadowColor: '#a259c6',
@@ -1037,6 +1048,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 4,
     elevation: 2,
+    fontFamily: 'PressStart2P',
   },
   addButton: {
     backgroundColor: '#a259c6',
@@ -1052,8 +1064,9 @@ const styles = StyleSheet.create({
   addButtonText: {
     color: 'white',
     fontWeight: '700',
-    fontSize: 18,
+    fontSize: 10,
     textAlign: 'center',
+    fontFamily: 'PressStart2P',
   },
   classListContainer: {
     marginTop: 10,
@@ -1076,13 +1089,15 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   className: {
-    fontSize: 16,
+    fontSize: 10,
     fontWeight: 'bold',
     color: '#6e3abf',
+    fontFamily: 'PressStart2P',
   },
   classTime: {
-    fontSize: 14,
+    fontSize: 8,
     color: '#7a58b8',
+    fontFamily: 'PressStart2P',
   },
   calendarContainer: {
     marginTop: 20,
@@ -1116,7 +1131,7 @@ const styles = StyleSheet.create({
   },
   deleteButtonText: {
     fontFamily: 'PressStart2P',
-    fontSize: 9,
+    fontSize: 6,
     color: '#fff',
   },
   toggleContainer: {
@@ -1138,7 +1153,7 @@ const styles = StyleSheet.create({
   },
   toggleText: {
     fontFamily: 'PressStart2P',
-    fontSize: 10,
+    fontSize: 8,
     color: '#6e3abf',
     textAlign: 'center',
   },
@@ -1147,19 +1162,20 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffeef8'
   },
   creatorText: {
-    fontSize: 10,
+    fontSize: 8,
     color: '#d291bc',
-    fontStyle: 'italic'
+    fontStyle: 'italic',
+    fontFamily: 'PressStart2P',
   },
   semesterText: {
     fontFamily: 'PressStart2P',
-    fontSize: 8,
+    fontSize: 6,
     color: '#d291bc',
     marginTop: 5,
   },
   noClassesText: {
     fontFamily: 'PressStart2P',
-    fontSize: 10,
+    fontSize: 8,
     color: '#d291bc',
     textAlign: 'center',
     marginTop: 20,
@@ -1405,6 +1421,17 @@ const styles = StyleSheet.create({
     fontFamily: 'PressStart2P',
     textAlign: 'center',
     marginTop: -2,
+  },
+  decorativeContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    overflow: 'hidden',
+  },
+  decorativeIcon: {
+    position: 'absolute',
   },
 });
 

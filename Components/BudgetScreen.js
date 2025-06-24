@@ -66,7 +66,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: 'PressStart2P',
-    fontSize: 24,
+    fontSize: 14,
     color: '#a259c6',
     marginBottom: 20,
     textAlign: 'center',
@@ -86,13 +86,13 @@ const styles = StyleSheet.create({
   },
   summaryLabel: {
     fontFamily: 'PressStart2P',
-    fontSize: 8,
+    fontSize: 6,
     color: '#d291bc',
     marginBottom: 5,
   },
   summaryValue: {
     fontFamily: 'PressStart2P',
-    fontSize: 12,
+    fontSize: 8,
     color: '#a259c6',
   },
   expenseList: {
@@ -114,13 +114,13 @@ const styles = StyleSheet.create({
   },
   expenseTitle: {
     fontFamily: 'PressStart2P',
-    fontSize: 12,
+    fontSize: 8,
     color: '#a259c6',
     marginBottom: 5,
   },
   expenseCategory: {
     fontFamily: 'PressStart2P',
-    fontSize: 8,
+    fontSize: 6,
     color: '#d291bc',
   },
   expenseAmount: {
@@ -129,7 +129,7 @@ const styles = StyleSheet.create({
   },
   amountText: {
     fontFamily: 'PressStart2P',
-    fontSize: 12,
+    fontSize: 8,
     color: '#a259c6',
     marginRight: 10,
   },
@@ -138,7 +138,7 @@ const styles = StyleSheet.create({
   },
   deleteButtonText: {
     fontFamily: 'PressStart2P',
-    fontSize: 16,
+    fontSize: 10,
     color: '#d291bc',
   },
   addButton: {
@@ -150,7 +150,7 @@ const styles = StyleSheet.create({
   },
   addButtonText: {
     fontFamily: 'PressStart2P',
-    fontSize: 12,
+    fontSize: 8,
     color: '#fff',
   },
 }); 

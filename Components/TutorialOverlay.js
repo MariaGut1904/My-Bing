@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity, Dimensions } from 'react-native';
 import { useTutorial } from './TutorialContext';
+import { useNavigation } from '@react-navigation/native';
 
 const { width, height } = Dimensions.get('window');
 
@@ -33,17 +34,33 @@ const tutorialSteps = [
 ];
 
 export const TutorialOverlay = () => {
-  const { showTutorial, currentStep, nextStep, skipTutorial, completeTutorial } = useTutorial();
+  const { showTutorial, currentStep, currentTab, nextStep, skipTutorial, completeTutorial } = useTutorial();
+  const navigation = useNavigation();
 
   if (!showTutorial) {
     console.log('Tutorial not showing because showTutorial is false');
     return null;
   }
 
-  console.log('Rendering tutorial overlay, current step:', currentStep);
+  console.log('Rendering tutorial overlay, current step:', currentStep, 'current tab:', currentTab);
   const currentTutorialStep = tutorialSteps[currentStep];
   const isLastStep = currentStep === tutorialSteps.length - 1;
   const isIntroduction = currentTutorialStep.isIntroduction;
+
+  // Manual navigation effect for tab switching
+  React.useEffect(() => {
+    if (showTutorial && currentStep >= 2 && currentTab) {
+      console.log(`TutorialOverlay: Manually navigating to ${currentTab}`);
+      setTimeout(() => {
+        try {
+          navigation.navigate(currentTab);
+          console.log(`TutorialOverlay: Successfully navigated to ${currentTab}`);
+        } catch (error) {
+          console.log(`TutorialOverlay: Navigation failed:`, error);
+        }
+      }, 100);
+    }
+  }, [currentStep, currentTab, showTutorial, navigation]);
 
   const handleNext = () => {
     if (isLastStep) {
@@ -84,14 +101,22 @@ export const TutorialOverlay = () => {
   // Bottom corner layout with speech bubble for tab explanations
   return (
     <View style={styles.transparentContainer}>
-      <View style={styles.speechBubbleContainer}>
-        <View style={styles.speechBubble}>
-          <Text style={styles.speechBubbleText}>{currentTutorialStep.text}</Text>
-          <View style={styles.speechBubbleArrow} />
+      {/* Tab indicator */}
+      {!isIntroduction && (
+        <View style={styles.tabIndicator}>
+          <Text style={styles.tabIndicatorText}>
+            Current Tab: {currentTab} (Step {currentStep + 1}/5)
+          </Text>
         </View>
-      </View>
+      )}
       
       <View style={styles.bottomCornerContainer}>
+        <View style={styles.speechBubble}>
+          <Text style={styles.sparkleLeft}>✨</Text>
+          <Text style={styles.speechBubbleText}>{currentTutorialStep.text}</Text>
+          <Text style={styles.sparkleRight}>✨</Text>
+          <View style={styles.speechBubbleArrow} />
+        </View>
         <Image
           source={currentTutorialStep.image}
           style={styles.bottomCornerMariaImage}
@@ -155,59 +180,77 @@ const styles = StyleSheet.create({
   },
   centerText: {
     fontFamily: 'PressStart2P',
-    fontSize: 12,
+    fontSize: 8,
     textAlign: 'center',
     color: '#a259c6',
-    lineHeight: 20,
+    lineHeight: 16,
   },
   // Bottom corner layout styles (for tab explanations)
   speechBubbleContainer: {
     position: 'absolute',
-    top: height * 0.15,
-    left: 20,
-    right: 20,
+    top: height * 0.12,
+    left: 15,
+    right: 15,
     zIndex: 10000,
   },
   speechBubble: {
-    backgroundColor: '#f8e1f4',
-    borderRadius: 20,
-    padding: 20,
-    borderWidth: 3,
-    borderColor: '#d291bc',
+    backgroundColor: '#ffeef8',
+    borderRadius: 12,
+    padding: 15,
+    borderWidth: 4,
+    borderColor: '#ffb6c1',
     position: 'relative',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    shadowColor: '#ffb6c1',
+    shadowOffset: { width: 3, height: 3 },
+    shadowOpacity: 0.5,
+    shadowRadius: 2,
     elevation: 8,
+    maxWidth: width * 0.7,
+    marginRight: 10,
+    // More rounded corners
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    borderBottomLeftRadius: 8,
+    borderBottomRightRadius: 8,
   },
   speechBubbleText: {
     fontFamily: 'PressStart2P',
-    fontSize: 12,
-    textAlign: 'center',
+    fontSize: 6,
+    textAlign: 'left',
     color: '#a259c6',
-    lineHeight: 20,
+    lineHeight: 10,
+    textShadowColor: '#ffb6c1',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 1,
+    paddingHorizontal: 10,
   },
   speechBubbleArrow: {
     position: 'absolute',
-    bottom: -15,
-    right: 50,
+    right: -15,
+    bottom: 30,
     width: 0,
     height: 0,
     backgroundColor: 'transparent',
     borderStyle: 'solid',
-    borderLeftWidth: 15,
-    borderRightWidth: 15,
-    borderTopWidth: 20,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-    borderTopColor: '#d291bc',
+    borderTopWidth: 15,
+    borderBottomWidth: 15,
+    borderLeftWidth: 18,
+    borderTopColor: 'transparent',
+    borderBottomColor: 'transparent',
+    borderLeftColor: '#ffb6c1',
+    // Add a small shadow to the arrow
+    shadowColor: '#ffb6c1',
+    shadowOffset: { width: 1, height: 1 },
+    shadowOpacity: 0.3,
+    shadowRadius: 1,
   },
   bottomCornerContainer: {
     position: 'absolute',
-    bottom: height * 0.15,
+    bottom: height * 0.12,
     right: 20,
     zIndex: 10000,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
   },
   bottomCornerMariaImage: {
     width: 100,
@@ -222,30 +265,62 @@ const styles = StyleSheet.create({
   },
   bottomButtonContainer: {
     position: 'absolute',
-    bottom: 50,
+    bottom: 30,
     left: 20,
     right: 20,
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
   button: {
-    padding: 15,
-    borderRadius: 10,
-    minWidth: 100,
+    padding: 10,
+    borderRadius: 8,
+    minWidth: 80,
     alignItems: 'center',
-    backgroundColor: '#f8e1f4',
+    backgroundColor: '#ffeef8',
     borderWidth: 2,
-    borderColor: '#d291bc',
+    borderColor: '#ffb6c1',
   },
   primaryButton: {
-    backgroundColor: '#d291bc',
+    backgroundColor: '#ffb6c1',
   },
   buttonText: {
     fontFamily: 'PressStart2P',
-    fontSize: 12,
+    fontSize: 8,
     color: '#a259c6',
   },
   primaryButtonText: {
     color: '#fff',
+  },
+  tabIndicator: {
+    position: 'absolute',
+    top: 20,
+    left: 20,
+    right: 20,
+    zIndex: 10001,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 10,
+    padding: 5,
+  },
+  tabIndicatorText: {
+    fontFamily: 'PressStart2P',
+    fontSize: 8,
+    color: '#fff',
+    textAlign: 'center',
+  },
+  sparkleLeft: {
+    position: 'absolute',
+    top: 5,
+    left: 5,
+    fontSize: 16,
+    color: '#ffb6c1',
+    zIndex: 1,
+  },
+  sparkleRight: {
+    position: 'absolute',
+    top: 5,
+    right: 5,
+    fontSize: 16,
+    color: '#ffb6c1',
+    zIndex: 1,
   },
 });

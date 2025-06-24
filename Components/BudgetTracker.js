@@ -13,10 +13,11 @@ import { AuthContext } from './AuthContext';
 
 // Preload images
 const images = {
-  kawaiiStar: require('../assets/kawaii-star.gif'),
-  pixelHeart: require('../assets/pixel-heart.gif'),
-  catFace: require('../assets/cat-face.gif'),
-  rainbow: require('../assets/rainbow.gif'),
+  decor5: require('../assets/decor5.gif'),
+  decor6: require('../assets/decor6.gif'),
+  decor7: require('../assets/decor7.gif'),
+  decor8: require('../assets/decor8.gif'),
+  decor9: require('../assets/decor9.gif'),
   pastelBg: require('../assets/pastel-pixel-bg.jpg'),
 };
 
@@ -26,16 +27,6 @@ const QuoteBubble = ({ text }) => (
     <Text style={styles.quoteText}>
       🎀 {text}
     </Text>
-  </View>
-);
-
-// 🎀 Decorative Icons
-const DecorativeElements = ({ isSmallScreen }) => (
-  <View style={styles.decorativeContainer}>
-    <Image source={images.kawaiiStar} style={[styles.decorativeStar, { top: isSmallScreen ? 20 : 40 }]} />
-    <Image source={images.pixelHeart} style={[styles.decorativeIcon, { top: isSmallScreen ? 5 : 10, right: 10, width: 25, height: 25 }]} />
-    <Image source={images.catFace} style={[styles.decorativeIcon, { bottom: isSmallScreen ? 5 : 10, left: 10, width: 25, height: 25 }]} />
-    <Image source={images.rainbow} style={[styles.decorativeIcon, { bottom: isSmallScreen ? 5 : 10, right: 10, width: 25, height: 25 }]} />
   </View>
 );
 
@@ -127,7 +118,7 @@ const BudgetTracker = () => {
         <ScrollView contentContainerStyle={styles.scrollContainer}>
           <Animatable.View animation="bounceIn" style={styles.header}>
             <Image 
-              source={require('../assets/kawaii-star.gif')} 
+              source={require('../assets/decor5.gif')} 
               style={styles.headerIcon}
             />
             <Text style={styles.title}>✨ Budget Tracker ✨</Text>
@@ -347,7 +338,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: 'PressStart2P',
-    fontSize: Platform.OS === 'ios' ? 14 : 12,
+    fontSize: 10,
     color: '#ff69b4',
     textShadowColor: 'rgba(255,255,255,0.7)',
     textShadowOffset: { width: 1, height: 1 },
@@ -384,7 +375,7 @@ const styles = StyleSheet.create({
   },
   tabText: {
     fontFamily: 'PressStart2P',
-    fontSize: 10,
+    fontSize: 8,
     color: '#ff69b4',
   },
   activeTabText: {
@@ -412,12 +403,12 @@ const styles = StyleSheet.create({
   },
   summaryTitle: {
     fontFamily: 'PressStart2P',
-    fontSize: 10,
+    fontSize: 8,
     color: '#ff69b4',
   },
   summaryAmount: {
     fontFamily: 'PressStart2P',
-    fontSize: 16,
+    fontSize: 10,
     color: '#ff69b4',
   },
   expenseList: {
@@ -445,12 +436,12 @@ const styles = StyleSheet.create({
   },
   expenseDescription: {
     fontFamily: 'PressStart2P',
-    fontSize: 10,
+    fontSize: 8,
     color: '#ff69b4',
   },
   expenseDate: {
     fontFamily: 'PressStart2P',
-    fontSize: 8,
+    fontSize: 6,
     color: '#ffb6c1',
   },
   expenseAmountContainer: {
@@ -459,7 +450,7 @@ const styles = StyleSheet.create({
   },
   expenseAmount: {
     fontFamily: 'PressStart2P',
-    fontSize: 12,
+    fontSize: 8,
     color: '#ff69b4',
     marginRight: 10,
   },
@@ -472,7 +463,7 @@ const styles = StyleSheet.create({
   },
   noExpensesText: {
     fontFamily: 'PressStart2P',
-    fontSize: 8,
+    fontSize: 6,
     color: '#ffb6c1',
     textAlign: 'center',
     marginTop: 10,
@@ -491,7 +482,7 @@ const styles = StyleSheet.create({
   },
   addButtonText: {
     fontFamily: 'PressStart2P',
-    fontSize: 12,
+    fontSize: 8,
     color: '#fff',
   },
   modalContainer: {
@@ -514,7 +505,7 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     fontFamily: 'PressStart2P',
-    fontSize: 12,
+    fontSize: 10,
     color: '#ff69b4',
     marginBottom: 15,
     textAlign: 'center',
@@ -527,7 +518,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#ffb6c1',
     fontFamily: 'PressStart2P',
-    fontSize: 10,
+    fontSize: 8,
     color: '#ff69b4',
   },
   modalButtons: {

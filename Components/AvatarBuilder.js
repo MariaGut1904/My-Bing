@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, Image, StyleSheet, TouchableOpacity, ScrollView, ImageBackground } from 'react-native';
+import { View, Text, Image, StyleSheet, TouchableOpacity, ScrollView, ImageBackground, SafeAreaView } from 'react-native';
 import * as Animatable from 'react-native-animatable';
 
 const AvatarBuilder = () => {
@@ -41,147 +41,155 @@ const AvatarBuilder = () => {
   ];
 
   return (
-    <ImageBackground source={require('../assets/pixel-bg.png')} style={styles.bg} resizeMode="cover">
-      <ScrollView contentContainerStyle={styles.container}>
+    <ImageBackground source={require('../assets/pixel-bg.png')} style={styles.bg}>
+      <SafeAreaView style={{ flex: 1 }}>
+        {/* Decorative Elements */}
+        <View style={styles.decorativeContainer}>
+          <Image source={require('../assets/decor5.gif')} style={[styles.decorativeIcon, { top: 30, left: 15, width: 25, height: 25 }]} />
+          <Image source={require('../assets/decor6.gif')} style={[styles.decorativeIcon, { top: 60, right: 15, width: 25, height: 25 }]} />
+          <Image source={require('../assets/decor7.gif')} style={[styles.decorativeIcon, { bottom: 150, left: 20, width: 25, height: 25 }]} />
+        </View>
+        
         <Animatable.View animation="bounceIn" style={styles.header}>
-          <Image source={require('../assets/kawaii-star.gif')} style={styles.starIcon} />
           <Text style={styles.title}>✨ Avatar Builder ✨</Text>
         </Animatable.View>
 
-        {/* Avatar Preview */}
-        <Animatable.View animation="pulse" iterationCount="infinite" style={styles.avatarContainer}>
-          <View style={styles.avatarBase}>
-            <Image source={require('../assets/avatar-base.png')} style={styles.baseImage} />
-            {upperHair !== 'none' && (
-              <Image 
-                source={upperHairOptions.find(h => h.id === upperHair)?.icon} 
-                style={styles.upperHairImage}
-              />
-            )}
-            {lowerHair !== 'none' && (
-              <Image 
-                source={lowerHairOptions.find(h => h.id === lowerHair)?.icon} 
-                style={styles.lowerHairImage}
-              />
-            )}
-            {outfit !== 'none' && (
-              <Image 
-                source={outfitOptions.find(o => o.id === outfit)?.icon} 
-                style={styles.outfitImage}
-              />
-            )}
-            {accessory !== 'none' && (
-              <Image 
-                source={accessoryOptions.find(a => a.id === accessory)?.icon} 
-                style={styles.accessoryImage}
-              />
-            )}
-          </View>
-        </Animatable.View>
+        <ScrollView contentContainerStyle={styles.container}>
+          {/* Avatar Preview */}
+          <Animatable.View animation="pulse" iterationCount="infinite" style={styles.avatarContainer}>
+            <View style={styles.avatarBase}>
+              <Image source={require('../assets/avatar-base.png')} style={styles.baseImage} />
+              {upperHair !== 'none' && (
+                <Image 
+                  source={upperHairOptions.find(h => h.id === upperHair)?.icon} 
+                  style={styles.upperHairImage}
+                />
+              )}
+              {lowerHair !== 'none' && (
+                <Image 
+                  source={lowerHairOptions.find(h => h.id === lowerHair)?.icon} 
+                  style={styles.lowerHairImage}
+                />
+              )}
+              {outfit !== 'none' && (
+                <Image 
+                  source={outfitOptions.find(o => o.id === outfit)?.icon} 
+                  style={styles.outfitImage}
+                />
+              )}
+              {accessory !== 'none' && (
+                <Image 
+                  source={accessoryOptions.find(a => a.id === accessory)?.icon} 
+                  style={styles.accessoryImage}
+                />
+              )}
+            </View>
+          </Animatable.View>
 
-        {/* Upper Hair Options */}
-        <Animatable.View animation="fadeInUp" style={styles.section}>
-          <Text style={styles.sectionTitle}>Upper Hair</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.optionsRow}>
-            {upperHairOptions.map((item) => (
-              <TouchableOpacity 
-                key={item.id} 
-                onPress={() => setUpperHair(item.id)}
-                style={styles.optionButton}
-              >
-                {item.icon ? (
+          {/* Upper Hair Options */}
+          <Animatable.View animation="fadeInUp" style={styles.section}>
+            <Text style={styles.sectionTitle}>Upper Hair</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.optionsRow}>
+              {upperHairOptions.map((item) => (
+                <TouchableOpacity 
+                  key={item.id} 
+                  onPress={() => setUpperHair(item.id)}
+                  style={styles.optionButton}
+                >
+                  {item.icon ? (
+                    <Image source={item.icon} style={[
+                      styles.optionImage,
+                      upperHair === item.id && styles.selectedOption
+                    ]} />
+                  ) : (
+                    <View style={styles.emptyOption}>
+                      <Text style={styles.optionText}>None</Text>
+                    </View>
+                  )}
+                  <Text style={styles.optionText}>{item.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </Animatable.View>
+
+          {/* Lower Hair Options */}
+          <Animatable.View animation="fadeInUp" delay={300} style={styles.section}>
+            <Text style={styles.sectionTitle}>Lower Hair</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.optionsRow}>
+              {lowerHairOptions.map((item) => (
+                <TouchableOpacity 
+                  key={item.id} 
+                  onPress={() => setLowerHair(item.id)}
+                  style={styles.optionButton}
+                >
+                  {item.icon ? (
+                    <Image source={item.icon} style={[
+                      styles.optionImage,
+                      lowerHair === item.id && styles.selectedOption
+                    ]} />
+                  ) : (
+                    <View style={styles.emptyOption}>
+                      <Text style={styles.optionText}>None</Text>
+                    </View>
+                  )}
+                  <Text style={styles.optionText}>{item.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </Animatable.View>
+
+          {/* Outfit Options */}
+          <Animatable.View animation="fadeInUp" delay={400} style={styles.section}>
+            <Text style={styles.sectionTitle}>Outfits</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.optionsRow}>
+              {outfitOptions.map((item) => (
+                <TouchableOpacity 
+                  key={item.id} 
+                  onPress={() => setOutfit(item.id)}
+                  style={styles.optionButton}
+                >
                   <Image source={item.icon} style={[
                     styles.optionImage,
-                    upperHair === item.id && styles.selectedOption
+                    outfit === item.id && styles.selectedOption
                   ]} />
-                ) : (
-                  <View style={styles.emptyOption}>
-                    <Text style={styles.optionText}>None</Text>
-                  </View>
-                )}
-                <Text style={styles.optionText}>{item.name}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </Animatable.View>
+                  <Text style={styles.optionText}>{item.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </Animatable.View>
 
-        {/* Lower Hair Options */}
-        <Animatable.View animation="fadeInUp" delay={300} style={styles.section}>
-          <Text style={styles.sectionTitle}>Lower Hair</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.optionsRow}>
-            {lowerHairOptions.map((item) => (
-              <TouchableOpacity 
-                key={item.id} 
-                onPress={() => setLowerHair(item.id)}
-                style={styles.optionButton}
-              >
-                {item.icon ? (
-                  <Image source={item.icon} style={[
-                    styles.optionImage,
-                    lowerHair === item.id && styles.selectedOption
-                  ]} />
-                ) : (
-                  <View style={styles.emptyOption}>
-                    <Text style={styles.optionText}>None</Text>
-                  </View>
-                )}
-                <Text style={styles.optionText}>{item.name}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </Animatable.View>
+          {/* Accessory Options */}
+          <Animatable.View animation="fadeInUp" delay={600} style={styles.section}>
+            <Text style={styles.sectionTitle}>Accessories</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.optionsRow}>
+              {accessoryOptions.map((item) => (
+                <TouchableOpacity 
+                  key={item.id} 
+                  onPress={() => setAccessory(item.id)}
+                  style={styles.optionButton}
+                >
+                  {item.icon ? (
+                    <Image source={item.icon} style={[
+                      styles.optionImage,
+                      accessory === item.id && styles.selectedOption
+                    ]} />
+                  ) : (
+                    <View style={styles.emptyOption}>
+                      <Text style={styles.optionText}>None</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </Animatable.View>
 
-        {/* Outfit Options */}
-        <Animatable.View animation="fadeInUp" delay={400} style={styles.section}>
-          <Text style={styles.sectionTitle}>Outfits</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.optionsRow}>
-            {outfitOptions.map((item) => (
-              <TouchableOpacity 
-                key={item.id} 
-                onPress={() => setOutfit(item.id)}
-                style={styles.optionButton}
-              >
-                <Image source={item.icon} style={[
-                  styles.optionImage,
-                  outfit === item.id && styles.selectedOption
-                ]} />
-                <Text style={styles.optionText}>{item.name}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </Animatable.View>
-
-        {/* Accessory Options */}
-        <Animatable.View animation="fadeInUp" delay={600} style={styles.section}>
-          <Text style={styles.sectionTitle}>Accessories</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.optionsRow}>
-            {accessoryOptions.map((item) => (
-              <TouchableOpacity 
-                key={item.id} 
-                onPress={() => setAccessory(item.id)}
-                style={styles.optionButton}
-              >
-                {item.icon ? (
-                  <Image source={item.icon} style={[
-                    styles.optionImage,
-                    accessory === item.id && styles.selectedOption
-                  ]} />
-                ) : (
-                  <View style={styles.emptyOption}>
-                    <Text style={styles.optionText}>None</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </Animatable.View>
-
-        <Animatable.View animation="pulse" iterationCount={1} style={styles.saveButtonContainer}>
-          <TouchableOpacity style={styles.saveButton}>
-            <Text style={styles.saveButtonText}>Save Avatar</Text>
-          </TouchableOpacity>
-        </Animatable.View>
-      </ScrollView>
+          <Animatable.View animation="pulse" iterationCount={1} style={styles.saveButtonContainer}>
+            <TouchableOpacity style={styles.saveButton}>
+              <Text style={styles.saveButtonText}>Save Avatar</Text>
+            </TouchableOpacity>
+          </Animatable.View>
+        </ScrollView>
+      </SafeAreaView>
     </ImageBackground>
   );
 };
@@ -208,7 +216,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: 'PressStart2P',
-    fontSize: 22,
+    fontSize: 14,
     color: '#a259c6',
     textShadowColor: 'rgba(255,255,255,0.7)',
     textShadowOffset: { width: 1, height: 1 },
@@ -260,7 +268,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontFamily: 'PressStart2P',
-    fontSize: 14,
+    fontSize: 10,
     color: '#a259c6',
     marginBottom: 10,
     textAlign: 'center',
@@ -297,7 +305,7 @@ const styles = StyleSheet.create({
   },
   optionText: {
     fontFamily: 'PressStart2P',
-    fontSize: 8,
+    fontSize: 6,
     color: '#a259c6',
     marginTop: 5,
   },
@@ -317,9 +325,21 @@ const styles = StyleSheet.create({
   },
   saveButtonText: {
     fontFamily: 'PressStart2P',
-    fontSize: 12,
+    fontSize: 8,
     color: 'white',
     textAlign: 'center',
+  },
+  decorativeContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'flex-start',
+    alignItems: 'flex-start',
+  },
+  decorativeIcon: {
+    position: 'absolute',
   },
 });
 
