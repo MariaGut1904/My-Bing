@@ -2,11 +2,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { View, ActivityIndicator, StyleSheet, Platform, LogBox, StatusBar } from 'react-native';
+import { View, ActivityIndicator, StyleSheet, Platform, LogBox, StatusBar, Image } from 'react-native';
 import { enableScreens } from 'react-native-screens';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import * as Font from 'expo-font';
+import { Asset } from 'expo-asset';
 import { AuthProvider, useAuth } from './Components/AuthContext';
 import { TaskProvider } from './Components/TaskContext';
 import { ScheduleProvider } from './Components/ScheduleContext';
@@ -179,23 +180,35 @@ function NavigationWrapper() {
 
 export default function App() {
   const [fontsLoaded, setFontsLoaded] = useState(false);
+  const [imagesLoaded, setImagesLoaded] = useState(false);
 
   useEffect(() => {
-    async function loadFonts() {
+    async function loadAssets() {
       try {
+        // Load fonts
         await Font.loadAsync({
           'PressStart2P': require('./assets/fonts/PressStart2P-Regular.ttf'),
         });
+
+        // Preload Maria's images for faster loading
+        await Promise.all([
+          Asset.loadAsync(require('./assets/Maria.png')),
+          Asset.loadAsync(require('./assets/Mar_hap.png')),
+          Asset.loadAsync(require('./assets/Mar_speak.png')),
+        ]);
+
         setFontsLoaded(true);
+        setImagesLoaded(true);
       } catch (error) {
-        console.log('Error loading fonts:', error);
+        console.log('Error loading assets:', error);
         setFontsLoaded(true); // Continue without custom font
+        setImagesLoaded(true); // Continue without preloaded images
       }
     }
-    loadFonts();
+    loadAssets();
   }, []);
 
-  if (!fontsLoaded) {
+  if (!fontsLoaded || !imagesLoaded) {
     return (
       <View style={styles.container}>
         <ActivityIndicator size="large" color="#ff69b4" />

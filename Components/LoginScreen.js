@@ -88,7 +88,7 @@ const LoginScreen = ({ navigation }) => {
 
   return (
     <ImageBackground
-      source={require('../assets/pastel-pixel-bg.jpg')}
+      source={require('../assets/pastel-pixel-bg.webp')}
       style={styles.background}
       resizeMode="cover"
     >

@@ -446,9 +446,13 @@ const SchedulePlanner = () => {
             const relevantClasses = updatedFull.filter(cls => cls.creator === currentUser || cls.isShared);
             setAllClasses(relevantClasses);
             setScheduleData(relevantClasses);
-            // Update marked dates
-            const newMarkedDates = getMarkedDates();
-            setMarkedDates(newMarkedDates);
+            // Update marked dates - convert array back to object format
+            const newMarkedDatesArray = getMarkedDates();
+            const newMarkedDatesObj = {};
+            newMarkedDatesArray.forEach(([date, config]) => {
+              newMarkedDatesObj[date] = config;
+            });
+            setMarkedDates(newMarkedDatesObj);
           }
         }
       ]
@@ -617,7 +621,7 @@ const SchedulePlanner = () => {
   }, [endTimeHour, endTimeMinute, endTimeAmPm]);
 
   return (
-    <ImageBackground source={require('../assets/pixel-bg.png')} style={styles.bg}>
+    <ImageBackground source={require('../assets/pixel-bg.webp')} style={styles.bg}>
       <SafeAreaView style={{ flex: 1 }}>
         {/* Decorative Elements */}
         <View style={styles.decorativeContainer}>

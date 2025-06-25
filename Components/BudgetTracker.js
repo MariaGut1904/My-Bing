@@ -19,7 +19,7 @@ const images = {
   decor7: require('../assets/decor7.gif'),
   decor8: require('../assets/decor8.gif'),
   decor9: require('../assets/decor9.gif'),
-  pastelBg: require('../assets/pastel-pixel-bg.jpg'),
+  pastelBg: require('../assets/pastel-pixel-bg.webp'),
 };
 
 // 🌟 Quote Bubble Component
@@ -113,7 +113,7 @@ const BudgetTracker = () => {
   return (
     <View style={{ flex: 1 }}>
       <ImageBackground 
-        source={require('../assets/pastel-pixel-bg.jpg')} 
+        source={require('../assets/pastel-pixel-bg.webp')} 
         style={styles.bg} 
         resizeMode="cover"
       >

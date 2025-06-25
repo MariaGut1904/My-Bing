@@ -17,9 +17,17 @@ const HomeScreen = ({ navigation }) => {
   const [isTaskModalVisible, setIsTaskModalVisible] = useState(false);
   const [newTaskText, setNewTaskText] = useState('');
   const [showHelp, setShowHelp] = useState(false);
+  const [avatarLoaded, setAvatarLoaded] = useState(false);
 
   // Debug logging
   console.log('HomeScreen currentUser:', currentUser);
+
+  useEffect(() => {
+    console.log('HomeScreen render start:', Date.now());
+    return () => {
+      console.log('HomeScreen render end:', Date.now());
+    };
+  }, []);
 
   const handleLogout = async () => {
     try {
@@ -124,7 +132,7 @@ const HomeScreen = ({ navigation }) => {
 
   return (
     <ImageBackground 
-      source={require('../assets/pastel-pixel-bg.jpg')} 
+      source={require('../assets/pastel-pixel-bg.webp')} 
       style={styles.bg} 
       resizeMode="cover"
     >
@@ -132,14 +140,13 @@ const HomeScreen = ({ navigation }) => {
         {/* Decorative Elements */}
         <View style={styles.decorativeContainer}>
           <Image source={require('../assets/decor8.gif')} style={[styles.decorativeIcon, { top: 20, left: 10, width: 25, height: 25 }]} />
-         
         </View>
         
         <ScrollView contentContainerStyle={styles.scrollContainer}>
-          <Animatable.View animation="bounceIn" style={styles.header}>
+          <Animatable.View animation={avatarLoaded ? 'bounceIn' : undefined} style={styles.header}>
             <Animatable.View 
-              animation="pulse" 
-              iterationCount="infinite" 
+              animation={avatarLoaded ? 'pulse' : undefined}
+              iterationCount="infinite"
               duration={2000}
               style={styles.avatarContainer}
             >
@@ -155,6 +162,8 @@ const HomeScreen = ({ navigation }) => {
                 } 
                 style={styles.avatar}
                 resizeMode="contain"
+                onLoad={() => setAvatarLoaded(true)}
+                defaultSource={require('../assets/avatar-base.png')}
               />
             </Animatable.View>
             <Text style={styles.welcomeText}>Welcome back, {currentUser || 'User'}</Text>
