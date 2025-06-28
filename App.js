@@ -14,6 +14,7 @@ import { ScheduleProvider } from './Components/ScheduleContext';
 import { BudgetProvider } from './Components/BudgetContext';
 import { TutorialProvider, useTutorial } from './Components/TutorialContext';
 import { TutorialOverlay } from './Components/TutorialOverlay';
+import ErrorBoundary from './Components/ErrorBoundary';
 import LoginScreen from './Components/LoginScreen';
 import HomeScreen from './Components/HomeScreen';
 import TasksScreen from './Components/TasksScreen';
@@ -33,7 +34,6 @@ LogBox.ignoreLogs([
   'Sending `onAnimatedValueUpdate` with no listeners registered',
   'Require cycle',
   'Possible Unhandled Promise Rejection',
-  'VirtualizedLists should never be nested',
   'Internal React error: Expected static flag was missing',
   'React has detected a change in the order of Hooks',
 ]);
@@ -49,27 +49,22 @@ function TabNavigator() {
   // Effect to change tab when tutorial step changes
   useEffect(() => {
     if (showTutorial && currentStep >= 2 && currentTab) {
-      console.log(`Tutorial navigating to tab: ${currentTab} for step ${currentStep}`);
-      
       // Use a more reliable navigation approach
       const navigateToTab = () => {
         if (navigationRef.current) {
           try {
             navigationRef.current.navigate(currentTab);
-            console.log(`Successfully navigated to ${currentTab}`);
           } catch (error) {
-            console.log('Navigation failed:', error);
+            // Navigation failed silently
           }
         } else {
-          console.log('Navigation ref not available, trying again...');
           // Retry after a short delay
           setTimeout(() => {
             if (navigationRef.current) {
               try {
                 navigationRef.current.navigate(currentTab);
-                console.log(`Successfully navigated to ${currentTab} on retry`);
               } catch (error) {
-                console.log('Navigation retry failed:', error);
+                // Navigation retry failed silently
               }
             }
           }, 300);
@@ -80,14 +75,6 @@ function TabNavigator() {
       navigateToTab();
     }
   }, [showTutorial, currentStep, currentTab]);
-
-  console.log('TabNavigator render:', { 
-    showTutorial, 
-    currentTab, 
-    currentStep,
-    shouldNavigate: showTutorial && currentStep >= 2,
-    navigationRef: !!navigationRef.current
-  });
 
   return (
     <Tab.Navigator
@@ -224,7 +211,9 @@ export default function App() {
           <ScheduleProvider>
             <BudgetProvider>
               <TutorialProvider>
-                <NavigationWrapper />
+                <ErrorBoundary>
+                  <NavigationWrapper />
+                </ErrorBoundary>
               </TutorialProvider>
             </BudgetProvider>
           </ScheduleProvider>

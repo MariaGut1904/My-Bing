@@ -3,7 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, SafeAreaVie
 import DropDownPicker from 'react-native-dropdown-picker';
 import * as Animatable from 'react-native-animatable';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { MonthCalendar } from '@quidone/react-native-calendars';
+import { Calendar } from 'react-native-big-calendar';
 import { useSchedule } from './ScheduleContext';
 import { useAuth } from './AuthContext';
 import { HelpOverlay } from './HelpOverlay';
@@ -34,6 +34,9 @@ const SchedulePlanner = () => {
   const [isComparing, setIsComparing] = useState(false);
   const [users, setUsers] = useState(['Maria', 'Luna', 'Reni', 'Sheila']);
   const [showHelp, setShowHelp] = useState(false);
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [timeListRef, setTimeListRef] = useState(null);
+  const [currentScrollY, setCurrentScrollY] = useState(0);
 
   // States for new time dropdowns
   const [startTimeHour, setStartTimeHour] = useState(null);
@@ -54,12 +57,7 @@ const SchedulePlanner = () => {
   // States for new date picker
   const [showDatePicker, setShowDatePicker] = useState(false);
 
-  // Fix: use useRef() instead of React.createRef() for functional components
-  const groupScrollRef = useRef();
-  const groupVerticalScrollRef = useRef();
-
-  // For smooth vertical paging in compare view
-  const verticalScrollOffset = useRef(0);
+  // For smooth vertical paging in compare view - simplified for FlatList
   const timeSlotHeight = 35; // Approximate height of each time slot row (matches minHeight in styles)
   const slotsPerPage = 16; // 4 hours (16 x 15min)
 
@@ -82,15 +80,43 @@ const SchedulePlanner = () => {
   const loadClasses = async () => {
     try {
       const savedClasses = await AsyncStorage.getItem('allClasses');
+      console.log('Raw saved classes from AsyncStorage:', savedClasses);
       let fullList = savedClasses ? JSON.parse(savedClasses) : [];
+      console.log('Parsed fullList:', fullList);
+      
+      // Clean up any invalid or orphaned data
+      fullList = fullList.filter(item => {
+        // Remove items without required fields
+        if (!item.id || !item.name || !item.creator) {
+          console.log('Filtering out item without required fields:', item);
+          return false;
+        }
+        
+        // Remove items with invalid dates
+        if (item.date && !item.date.match(/^\d{4}-\d{2}-\d{2}$/)) {
+          console.log('Filtering out item with invalid date:', item);
+          return false;
+        }
+        
+        // Remove items with invalid times
+        if (!item.startTime || !item.endTime) {
+          console.log('Filtering out item with invalid times:', item);
+          return false;
+        }
+        
+        return true;
+      });
+      
+      console.log('After filtering, fullList length:', fullList.length);
       setAllClassesFull(fullList);
       // Only filter for display
       const relevantClasses = fullList.filter(cls => cls.creator === currentUser || cls.isShared);
+      console.log('Relevant classes for current user:', relevantClasses.length);
       setAllClasses(relevantClasses);
       setScheduleData(relevantClasses);
-      // Update marked dates for all loaded classes
+      // Update marked dates for all loaded classes (use fullList, not relevantClasses)
       const newMarkedDates = {};
-      relevantClasses.forEach(item => {
+      fullList.forEach(item => {
         if (item.isRecurring) {
           const semesterDates = getSemesterDates(item.semester);
           let currentDate = new Date(semesterDates.start);
@@ -128,10 +154,9 @@ const SchedulePlanner = () => {
   useEffect(() => {
     const saveClasses = async () => {
       try {
-        if (allClasses.length > 0) {
-          console.log('Saving classes:', allClasses);
-          await AsyncStorage.setItem('allClasses', JSON.stringify(allClasses));
-          console.log('Successfully saved classes to AsyncStorage');
+        // Save allClassesFull instead of allClasses to preserve all data
+        if (allClassesFull.length > 0) {
+          await AsyncStorage.setItem('allClasses', JSON.stringify(allClassesFull));
         }
       } catch (error) {
         console.error('Error saving classes:', error);
@@ -139,7 +164,7 @@ const SchedulePlanner = () => {
     };
 
     saveClasses();
-  }, [allClasses]);
+  }, [allClassesFull]);
 
   // Update handleDeleteAll to recalculate marked dates from allClassesFull after deletion
   const handleDeleteAll = () => {
@@ -152,41 +177,39 @@ const SchedulePlanner = () => {
           text: "Delete All",
           style: "destructive",
           onPress: async () => {
-            // Remove only current user's items (including their shared items)
-            const updatedFull = allClassesFull.filter(item => item.creator !== currentUser);
-            setAllClassesFull(updatedFull);
-            await AsyncStorage.setItem('allClasses', JSON.stringify(updatedFull));
-            // Update filtered lists for display
-            const relevantClasses = updatedFull.filter(cls => cls.creator === currentUser || cls.isShared);
-            setAllClasses(relevantClasses);
-            setScheduleData(relevantClasses);
-            // Update marked dates using updatedFull
-            const newMarkedDates = {};
-            updatedFull.forEach(item => {
-              if (item.isRecurring) {
-                const semesterDates = getSemesterDates(item.semester);
-                let currentDate = new Date(semesterDates.start);
-                while (currentDate <= semesterDates.end) {
-                  if (currentDate.getDay() === item.day) {
-                    const dateStr = currentDate.toISOString().split('T')[0];
-                    newMarkedDates[dateStr] = { 
-                      marked: true, 
-                      dotColor: item.semester === semester ? '#a259c6' : '#d1b3ff',
-                      selected: item.semester === semester
-                    };
-                  }
-                  currentDate.setDate(currentDate.getDate() + 1);
-                }
-              } else if (item.date) {
-                newMarkedDates[item.date] = { 
-                  marked: true, 
-                  dotColor: item.semester === semester ? '#a259c6' : '#d1b3ff',
-                  selected: item.semester === semester
-                };
+            try {
+              // Remove current user's items (including their shared items)
+              const updatedFull = allClassesFull.filter(item => item.creator !== currentUser);
+              
+              setAllClassesFull(updatedFull);
+              await AsyncStorage.setItem('allClasses', JSON.stringify(updatedFull));
+              
+              // Update filtered lists for display
+              const relevantClasses = updatedFull.filter(cls => cls.creator === currentUser || cls.isShared);
+              setAllClasses(relevantClasses);
+              setScheduleData(relevantClasses);
+              
+              // Force immediate recalculation of marked dates
+              const newMarkedDatesArray = getMarkedDates();
+              const newMarkedDatesObj = {};
+              newMarkedDatesArray.forEach(([date, config]) => {
+                newMarkedDatesObj[date] = config;
+              });
+              setMarkedDates(newMarkedDatesObj);
+              
+              // Force refresh of daily schedule
+              if (selectedDate) {
+                const schedule = getDailySchedule();
+                setDailyClasses(schedule);
+              } else {
+                setDailyClasses([]);
               }
-            });
-            setMarkedDates(newMarkedDates);
-            Alert.alert("Success", "All your classes and events have been deleted.");
+              
+              Alert.alert("Success", "All your classes and events have been deleted.");
+            } catch (error) {
+              console.error('Error deleting all items:', error);
+              Alert.alert('Error', 'Failed to delete all items. Please try again.');
+            }
           }
         }
       ]
@@ -227,6 +250,7 @@ const SchedulePlanner = () => {
         endTime,
         day: day,
         isRecurring: true,
+        isEvent: false,
         creator: currentUser,
         semester: semester,
         semesterStart: semesterDates.start.toISOString().split('T')[0],
@@ -242,6 +266,7 @@ const SchedulePlanner = () => {
         endTime,
         date: selectedDate,
         isRecurring: false,
+        isEvent: true,
         creator: currentUser,
         semester: semester,
         semesterStart: semesterDates.start.toISOString().split('T')[0],
@@ -257,30 +282,13 @@ const SchedulePlanner = () => {
       const relevantClasses = updatedFull.filter(cls => cls.creator === currentUser || cls.isShared);
       setAllClasses(relevantClasses);
       setScheduleData(relevantClasses);
-      // Update marked dates as before
-      const newMarkedDates = { ...markedDates };
-      if (!isEvent) {
-        const semesterDates = getSemesterDates(semester);
-        let currentDate = new Date(semesterDates.start);
-        while (currentDate <= semesterDates.end) {
-          if (currentDate.getDay() === day) {
-            const dateStr = currentDate.toISOString().split('T')[0];
-            newMarkedDates[dateStr] = { 
-              marked: true, 
-              dotColor: '#a259c6',
-              selected: true
-            };
-          }
-          currentDate.setDate(currentDate.getDate() + 1);
-        }
-      } else {
-        newMarkedDates[selectedDate] = { 
-          marked: true, 
-          dotColor: '#a259c6',
-          selected: true
-        };
+      
+      // Force refresh of daily schedule if we're on the selected date
+      if (selectedDate) {
+        const schedule = getDailySchedule();
+        setDailyClasses(schedule);
       }
-      setMarkedDates(newMarkedDates);
+      
       // Reset form
       setClassName('');
       setStartTimeHour(null);
@@ -291,7 +299,9 @@ const SchedulePlanner = () => {
       setEndTimeAmPm(null);
       setDay(null);
       setEventDescription('');
-      setSelectedDate(null);
+      // Don't reset selectedDate - keep it so user can see their newly added class/event
+      
+      Alert.alert("Success", `${isEvent ? 'Event' : 'Class'} added successfully!`);
     } catch (error) {
       Alert.alert('Error', 'Failed to save item: ' + error.message);
     }
@@ -320,22 +330,27 @@ const SchedulePlanner = () => {
     } else {
       dateObj = new Date();
     }
+    
+    // Fix timezone issue by using local date
+    const localDate = new Date(dateObj.getTime() - (dateObj.getTimezoneOffset() * 60000));
+    
     // Build YYYY-MM-DD in local time
-    const year = dateObj.getFullYear();
-    const month = (dateObj.getMonth() + 1).toString().padStart(2, '0');
-    const day = dateObj.getDate().toString().padStart(2, '0');
+    const year = localDate.getFullYear();
+    const month = (localDate.getMonth() + 1).toString().padStart(2, '0');
+    const day = localDate.getDate().toString().padStart(2, '0');
     const dayString = `${year}-${month}-${day}`;
-    setSelectedDate(dayString);
-    const selectedDay = dateObj.getDay();
-    const filtered = allClassesFull.filter(cls => {
-      if (cls.creator !== currentUser) return false;
-      if (cls.isRecurring) {
-        return cls.day === selectedDay && dayString >= cls.semesterStart && dayString <= cls.semesterEnd;
-      } else {
-        return cls.date === dayString;
-      }
+    
+    console.log('handleDayPress:', {
+      originalInput: input,
+      dateObj,
+      localDate,
+      dayString
     });
-    setDailyClasses(filtered);
+    
+    setSelectedDate(dayString);
+    // Use getDailySchedule for consistent filtering logic
+    const schedule = getDailySchedule();
+    setDailyClasses(schedule);
   };
 
   const handleShare = async (item) => {
@@ -366,10 +381,6 @@ const SchedulePlanner = () => {
       setAllClassesFull(updatedFullList);
       await AsyncStorage.setItem('allClasses', JSON.stringify(updatedFullList));
 
-      // Re-calculate marked dates
-      const newMarkedDates = getMarkedDates();
-      setMarkedDates(newMarkedDates);
-
       Alert.alert("Shared!", `${item.type === 'class' ? 'Class' : 'Event'} has been shared.`);
 
     } catch (error) {
@@ -381,14 +392,81 @@ const SchedulePlanner = () => {
     if (!selectedDate) return [];
     const selectedDateObj = new Date(selectedDate + 'T00:00:00');
     const selectedDay = selectedDateObj.getDay();
-    return allClassesFull.filter(item => {
-      // Only show the original (not shared) items for the current user
-      if (item.creator !== currentUser) return false;
-      if (item.isShared) return false;
-      if (item.isRecurring) {
-        return item.day === selectedDay && selectedDate >= item.semesterStart && selectedDate <= item.semesterEnd;
+    
+    console.log('getDailySchedule called with:', {
+      selectedDate,
+      selectedDay,
+      currentUser,
+      allClassesFullLength: allClassesFull.length
+    });
+    
+    const filteredItems = allClassesFull.filter(item => {
+      console.log('Checking item:', {
+        name: item.name,
+        creator: item.creator,
+        currentUser,
+        isShared: item.isShared,
+        isRecurring: item.isRecurring,
+        day: item.day,
+        date: item.date,
+        semester: item.semester
+      });
+      
+      // Only show items for the current user
+      if (item.creator !== currentUser) {
+        console.log('Filtered out - wrong creator:', item.name, item.creator);
+        return false;
       }
-      return item.date === selectedDate;
+      
+      // Don't show shared items in the main schedule view
+      if (item.isShared) {
+        console.log('Filtered out - shared item:', item.name);
+        return false;
+      }
+      
+      // Check if it's a recurring item
+      if (item.isRecurring) {
+        // Verify the item is within the semester date range
+        const semesterDates = getSemesterDates(item.semester);
+        const semesterStart = semesterDates.start.toISOString().split('T')[0];
+        const semesterEnd = semesterDates.end.toISOString().split('T')[0];
+        
+        const isCorrectDay = item.day === selectedDay;
+        const isInSemesterRange = selectedDate >= semesterStart && selectedDate <= semesterEnd;
+        
+        console.log('Recurring item check:', {
+          itemName: item.name,
+          itemDay: item.day,
+          selectedDay,
+          isCorrectDay,
+          semesterStart,
+          semesterEnd,
+          selectedDate,
+          isInSemesterRange
+        });
+        
+        return isCorrectDay && isInSemesterRange;
+      }
+      
+      // For non-recurring items, check if the date matches
+      const dateMatches = item.date === selectedDate;
+      console.log('Non-recurring item check:', {
+        itemName: item.name,
+        itemDate: item.date,
+        selectedDate,
+        dateMatches
+      });
+      
+      return dateMatches;
+    });
+    
+    console.log('Filtered items:', filteredItems.map(item => ({ name: item.name, time: item.startTime })));
+    
+    return filteredItems.sort((a, b) => {
+      // Sort by start time
+      const timeA = a.startTime;
+      const timeB = b.startTime;
+      return timeA.localeCompare(timeB);
     });
   };
 
@@ -432,93 +510,128 @@ const SchedulePlanner = () => {
 
   const handleDeleteItem = (item) => {
     Alert.alert(
-      'Delete',
+      "Delete Item",
       `Are you sure you want to delete "${item.name}"?`,
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: "Cancel", style: "cancel" },
         {
-          text: 'Delete', style: 'destructive', onPress: async () => {
-            // Only remove if the item belongs to the current user
-            const updatedFull = allClassesFull.filter(i => !(i.id === item.id && i.creator === currentUser));
-            setAllClassesFull(updatedFull);
-            await AsyncStorage.setItem('allClasses', JSON.stringify(updatedFull));
-            // Update filtered lists for display
-            const relevantClasses = updatedFull.filter(cls => cls.creator === currentUser || cls.isShared);
-            setAllClasses(relevantClasses);
-            setScheduleData(relevantClasses);
-            // Update marked dates - convert array back to object format
-            const newMarkedDatesArray = getMarkedDates();
-            const newMarkedDatesObj = {};
-            newMarkedDatesArray.forEach(([date, config]) => {
-              newMarkedDatesObj[date] = config;
-            });
-            setMarkedDates(newMarkedDatesObj);
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              // Remove the original item and any shared copies
+              const updatedFull = allClassesFull.filter(cls => {
+                // Remove the original item
+                if (cls.id === item.id) return false;
+                // Remove any shared copies that reference this item
+                if (cls.originalId === item.id) return false;
+                // Remove any items that share the same name, creator, and time (duplicates)
+                if (cls.name === item.name && 
+                    cls.creator === item.creator && 
+                    cls.startTime === item.startTime && 
+                    cls.endTime === item.endTime &&
+                    cls.day === item.day &&
+                    cls.date === item.date) return false;
+                return true;
+              });
+              
+              setAllClassesFull(updatedFull);
+              await AsyncStorage.setItem('allClasses', JSON.stringify(updatedFull));
+              
+              // Update filtered lists for display
+              const relevantClasses = updatedFull.filter(cls => cls.creator === currentUser || cls.isShared);
+              setAllClasses(relevantClasses);
+              setScheduleData(relevantClasses);
+              
+              // Force immediate recalculation of marked dates
+              const newMarkedDatesArray = getMarkedDates();
+              const newMarkedDatesObj = {};
+              newMarkedDatesArray.forEach(([date, config]) => {
+                newMarkedDatesObj[date] = config;
+              });
+              setMarkedDates(newMarkedDatesObj);
+              
+              // Force refresh of daily schedule
+              if (selectedDate) {
+                const schedule = getDailySchedule();
+                setDailyClasses(schedule);
+              }
+              
+              Alert.alert("Success", `Successfully deleted ${item.name}`);
+            } catch (error) {
+              console.error('Error deleting item:', error);
+              Alert.alert('Error', 'Failed to delete item. Please try again.');
+            }
           }
         }
       ]
     );
   };
 
-  const renderDailyItem = ({ item }) => (
-    <Animatable.View
-      animation="fadeIn"
-      style={styles.dailyItem}
-    >
-      <View style={styles.dailyItemContent}>
-        <View style={styles.dailyItemInfo}>
-          <Text style={styles.dailyItemTitle}>
-            {item.name}
-            <Text style={styles.creatorText}> ~{item.creator}</Text>
-          </Text>
-          <Text style={styles.dailyItemTime}>
-            {item.startTime} - {item.endTime}
-          </Text>
+  const renderDailyItem = ({ item }) => {
+    console.log('renderDailyItem called with:', item);
+    return (
+      <Animatable.View
+        animation="fadeIn"
+        style={styles.dailyItem}
+      >
+        <View style={styles.dailyItemContent}>
+          <View style={styles.dailyItemInfo}>
+            <Text style={styles.dailyItemTitle}>
+              {item.name}
+              <Text style={styles.creatorText}> ~{item.creator}</Text>
+            </Text>
+            <Text style={styles.dailyItemTime}>
+              {item.startTime} - {item.endTime}
+            </Text>
+          </View>
+          {/* Show delete icon if this is the current user's item */}
+          {item.creator === currentUser && (
+            <TouchableOpacity
+              style={styles.deleteButton}
+              onPress={() => handleDeleteItem(item)}
+            >
+              <Image source={require('../assets/trash.png')} style={styles.deleteIcon} />
+            </TouchableOpacity>
+          )}
         </View>
-        {/* Show delete icon if this is the current user's item */}
-        {item.creator === currentUser && (
+        {/* Show share button only on original, un-shared items in the "Your Schedule" tab */}
+        {!item.isShared && (
           <TouchableOpacity
-            style={styles.deleteButton}
-            onPress={() => handleDeleteItem(item)}
+            style={styles.shareButton}
+            onPress={() => handleShare(item)}
           >
-            <Image source={require('../assets/trash.png')} style={styles.deleteIcon} />
+            <Text style={styles.shareButtonText}>Share</Text>
           </TouchableOpacity>
         )}
-      </View>
-      {/* Show share button only on original, un-shared items in the "Your Schedule" tab */}
-      {!item.isShared && (
-        <TouchableOpacity
-          style={styles.shareButton}
-          onPress={() => handleShare(item)}
-        >
-          <Text style={styles.shareButtonText}>Share</Text>
-        </TouchableOpacity>
-      )}
-    </Animatable.View>
-  );
+      </Animatable.View>
+    );
+  };
 
   // Add useEffect to update daily schedule when selectedDate changes
   useEffect(() => {
     if (selectedDate) {
       const schedule = getDailySchedule();
       setDailyClasses(schedule);
+    } else {
+      setDailyClasses([]);
     }
-  }, [selectedDate, allClassesFull, isComparing]);
+  }, [selectedDate, allClassesFull, currentUser, semester]);
 
-  // Add console.log for debugging
+  // Add useEffect to update marked dates when allClassesFull changes
   useEffect(() => {
-    if (selectedDate) {
-      console.log('Selected Date:', selectedDate);
-      console.log('All Classes:', allClasses);
-      console.log('Marked Dates:', markedDates);
-      console.log('Daily Schedule:', getDailySchedule());
-    }
-  }, [selectedDate, allClasses, markedDates]);
+    const newMarkedDatesArray = getMarkedDates();
+    const newMarkedDatesObj = {};
+    newMarkedDatesArray.forEach(([date, config]) => {
+      newMarkedDatesObj[date] = config;
+    });
+    setMarkedDates(newMarkedDatesObj);
+  }, [allClassesFull, semester]);
 
   // Add useEffect to reload classes when the app comes to foreground
   useEffect(() => {
     const subscription = AppState.addEventListener('change', nextAppState => {
       if (nextAppState === 'active') {
-        console.log('App came to foreground, reloading classes...'); // Debug log
         loadClasses();
       }
     });
@@ -573,23 +686,36 @@ const SchedulePlanner = () => {
     const selectedDateObj = new Date(selectedDate + 'T00:00:00');
     const selectedDay = selectedDateObj.getDay();
 
+    console.log(`Looking for events for user ${user} at time ${timeLabel} (${slotStart}-${slotEnd}) on day ${selectedDay}`);
+    console.log(`Available items for ${user}:`, allClassesFull.filter(item => item.creator === user));
+
     const event = allClassesFull.find(item => {
-      if (item.creator !== user) return false;
+      // Find items for the specific user (creator matches user OR item is shared and user is the creator)
+      if (item.creator !== user && !(item.isShared && item.creator === user)) return false;
+      
       // Parse event start/end
       const [eventStartHour, eventStartMinute] = item.startTime.split(':').map(Number);
       const [eventEndHour, eventEndMinute] = item.endTime.split(':').map(Number);
       const eventStart = eventStartHour * 60 + eventStartMinute;
       const eventEnd = eventEndHour * 60 + eventEndMinute;
+      
       // Check if the 15-minute slot overlaps with the event
       if (slotStart < eventEnd && slotEnd > eventStart) {
         if (item.isRecurring) {
-          return item.day === selectedDay;
+          const dayMatches = item.day === selectedDay;
+          console.log(`Recurring event ${item.name}: day ${item.day} vs selected ${selectedDay}, matches: ${dayMatches}`);
+          return dayMatches;
         }
-        return item.date === selectedDate;
+        const dateMatches = item.date === selectedDate;
+        console.log(`One-time event ${item.name}: date ${item.date} vs selected ${selectedDate}, matches: ${dateMatches}`);
+        return dateMatches;
       }
       return false;
     });
-    return event ? event.name : 'Free';
+    
+    const result = event ? event.name : 'Free';
+    console.log(`Result for ${user} at ${timeLabel}: ${result}`);
+    return result;
   };
 
   useEffect(() => {
@@ -620,390 +746,631 @@ const SchedulePlanner = () => {
     }
   }, [endTimeHour, endTimeMinute, endTimeAmPm]);
 
+  // Force refresh function for immediate updates
+  const forceRefresh = async () => {
+    await loadClasses();
+    if (selectedDate) {
+      const schedule = getDailySchedule();
+      setDailyClasses(schedule);
+    }
+  };
+
+  // Helper functions for recurring events:
+  function getNextOccurrence(item, selectedDate) {
+    // If selectedDate is provided, use that day, otherwise use today
+    const baseDate = selectedDate ? new Date(selectedDate + 'T00:00:00') : new Date();
+    // Set to the correct weekday
+    const dayDiff = (item.day - baseDate.getDay() + 7) % 7;
+    const nextDate = new Date(baseDate);
+    nextDate.setDate(baseDate.getDate() + dayDiff);
+    // Set start time
+    const [hour, minute] = item.startTime.split(':').map(Number);
+    nextDate.setHours(hour, minute, 0, 0);
+    return nextDate;
+  }
+  function getNextOccurrenceEnd(item, selectedDate) {
+    const baseDate = selectedDate ? new Date(selectedDate + 'T00:00:00') : new Date();
+    const dayDiff = (item.day - baseDate.getDay() + 7) % 7;
+    const nextDate = new Date(baseDate);
+    nextDate.setDate(baseDate.getDate() + dayDiff);
+    // Set end time
+    const [hour, minute] = item.endTime.split(':').map(Number);
+    nextDate.setHours(hour, minute, 0, 0);
+    return nextDate;
+  }
+
   return (
     <ImageBackground source={require('../assets/pixel-bg.webp')} style={styles.bg}>
-      <SafeAreaView style={{ flex: 1 }}>
-        {/* Decorative Elements */}
-        <View style={styles.decorativeContainer}>
-          
-          <Image source={require('../assets/decor2.gif')} style={[styles.decorativeIcon, { top: 50, right: 10, width: 25, height: 25 }]} />
-          <Image source={require('../assets/decor3.gif')} style={[styles.decorativeIcon, { bottom: 100, left: 15, width: 25, height: 25 }]} />
-          <Image source={require('../assets/decor4.gif')} style={[styles.decorativeIcon, { bottom: 130, right: 15, width: 25, height: 25 }]} />
-        </View>
+      {/* Decorative Elements */}
+      <View style={styles.decorativeContainer}>
         
-        <Animatable.View animation="bounceIn" style={styles.header}>
-          <Image source={require('../assets/kawaii-star.gif')} style={styles.starIcon} />
-          <Text style={styles.title}>✨ Schedule Planner ✨</Text>
-          <View style={styles.headerButtons}>
-            <TouchableOpacity 
-              style={styles.helpButton}
-              onPress={() => setShowHelp(true)}
-            >
-              <Image 
-                source={require('../assets/help.png')} 
-                style={styles.helpIcon}
-              />
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.deleteAllButton}
-              onPress={handleDeleteAll}
-            >
-              <Text style={styles.deleteButtonText}>Delete All</Text>
-            </TouchableOpacity>
-          </View>
-        </Animatable.View>
-        <ScrollView contentContainerStyle={styles.scrollContainer}>
-          <View style={styles.toggleContainer}>
-            <TouchableOpacity
-              style={[styles.toggleButton, !isEvent && !isComparing && styles.activeToggle]}
-              onPress={() => {
-                setIsEvent(false);
-                setIsComparing(false);
-              }}
-            >
-              <Text style={styles.toggleText}>Class</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.toggleButton, isEvent && !isComparing && styles.activeToggle]}
-              onPress={() => {
-                setIsEvent(true);
-                setIsComparing(false);
-              }}
-            >
-              <Text style={styles.toggleText}>Event</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.toggleButton, isComparing && styles.activeToggle]}
-              onPress={() => {
-                setIsComparing(true);
-                setIsEvent(false);
-              }}
-            >
-              <Text style={styles.toggleText}>Compare</Text>
-            </TouchableOpacity>
-          </View>
+        <Image source={require('../assets/decor2.gif')} style={[styles.decorativeIcon, { top: 50, right: 10, width: 25, height: 25 }]} />
+        <Image source={require('../assets/decor3.gif')} style={[styles.decorativeIcon, { bottom: 100, left: 15, width: 25, height: 25 }]} />
+        <Image source={require('../assets/decor4.gif')} style={[styles.decorativeIcon, { bottom: 130, right: 15, width: 25, height: 25 }]} />
+      </View>
+      
+      <Animatable.View animation="bounceIn" style={styles.header}>
+        <Image source={require('../assets/kawaii-star.gif')} style={styles.starIcon} />
+        <Text style={styles.title}>✨ Schedule Planner ✨</Text>
+        <View style={styles.headerButtons}>
+          <TouchableOpacity
+            style={styles.helpButton}
+            onPress={() => setShowHelp(true)}
+          >
+            <Image source={require('../assets/help.png')} style={styles.helpIcon} />
+          </TouchableOpacity>
+          
+          {/* Debug Button */}
+          <TouchableOpacity
+            style={styles.debugButton}
+            onPress={() => {
+              console.log('=== DEBUG INFO ===');
+              console.log('Current User:', currentUser);
+              console.log('Selected Date:', selectedDate);
+              console.log('Current Semester:', semester);
+              console.log('Is Comparing:', isComparing);
+              console.log('Users Array:', users);
+              console.log('All Classes Full Length:', allClassesFull.length);
+              console.log('All Classes:', allClassesFull);
+              console.log('Daily Classes Length:', dailyClasses.length);
+              console.log('Daily Classes:', dailyClasses);
+              console.log('getDailySchedule() result:', getDailySchedule());
+              console.log('Time Slots Generated:', generateTimeSlots().length);
+              console.log('=== END DEBUG INFO ===');
+              
+              Alert.alert(
+                'Debug Info',
+                `isComparing: ${isComparing}\nselectedDate: ${selectedDate}\nusers: ${users.length}\nclasses: ${allClassesFull.length}\ntimeSlots: ${generateTimeSlots().length}`,
+                [{ text: 'OK' }]
+              );
+            }}
+          >
+            <Text style={styles.debugButtonText}>🐛 Debug</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.refreshButton}
+            onPress={forceRefresh}
+          >
+            <Text style={styles.debugButtonText}>Refresh</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.debugShowButton}
+            onPress={async () => {
+              const savedClasses = await AsyncStorage.getItem('allClasses');
+              console.log('=== ASYNCSTORAGE DEBUG ===');
+              console.log('Raw saved classes:', savedClasses);
+              if (savedClasses) {
+                const parsed = JSON.parse(savedClasses);
+                console.log('Parsed classes:', parsed);
+                console.log('Number of classes:', parsed.length);
+              } else {
+                console.log('No classes found in AsyncStorage');
+              }
+              console.log('=== END ASYNCSTORAGE DEBUG ===');
+              
+              Alert.alert(
+                'AsyncStorage Debug',
+                `Raw data: ${savedClasses ? savedClasses.substring(0, 200) + '...' : 'null'}`,
+                [{ text: 'OK' }]
+              );
+            }}
+          >
+            <Text style={styles.debugButtonText}>Storage</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.debugShowButton}
+            onPress={() => {
+              console.log('=== CURRENT STATE DEBUG ===');
+              console.log('Selected Date:', selectedDate);
+              console.log('All Classes Full:', allClassesFull);
+              console.log('All Classes Full Length:', allClassesFull.length);
+              console.log('Current User:', currentUser);
+              console.log('Is Comparing:', isComparing);
+              console.log('Users:', users);
+              console.log('=== END CURRENT STATE DEBUG ===');
+              
+              Alert.alert(
+                'Current State',
+                `Selected Date: ${selectedDate}\nClasses: ${allClassesFull.length}\nIs Comparing: ${isComparing}`,
+                [{ text: 'OK' }]
+              );
+            }}
+          >
+            <Text style={styles.debugButtonText}>State</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.debugShowButton}
+            onPress={async () => {
+              // Create a single test class for Maria
+              const today = new Date();
+              const todayString = today.toISOString().split('T')[0];
+              const todayDay = today.getDay();
+              
+              const singleTestClass = {
+                id: 'single-test',
+                name: 'Test Class',
+                creator: 'Maria',
+                startTime: '09:00',
+                endTime: '10:00',
+                day: todayDay,
+                date: todayString,
+                isRecurring: false,
+                semester: 'Fall 2025',
+                isShared: false
+              };
+              
+              console.log('Creating single test class:', singleTestClass);
+              await AsyncStorage.setItem('allClasses', JSON.stringify([singleTestClass]));
+              await loadClasses();
+              setSelectedDate(todayString);
+              
+              Alert.alert('Single Test', 'Created one test class for Maria. Check Compare tab!');
+            }}
+          >
+            <Text style={styles.debugButtonText}>Single Test</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.debugShowButton}
+            onPress={async () => {
+              // Clear all data
+              await AsyncStorage.removeItem('allClasses');
+              await loadClasses();
+              setSelectedDate(null);
+              
+              Alert.alert('Cleared', 'All data cleared!');
+            }}
+          >
+            <Text style={styles.debugButtonText}>Clear All</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.deleteAllButton}
+            onPress={handleDeleteAll}
+          >
+            <Text style={styles.deleteButtonText}>Delete All</Text>
+          </TouchableOpacity>
+        </View>
+      </Animatable.View>
+      <ScrollView 
+        style={{ flex: 1 }}
+        contentContainerStyle={styles.scrollContainer}
+        showsVerticalScrollIndicator={true}
+        nestedScrollEnabled={true}
+      >
+        <View style={styles.toggleContainer}>
+          <TouchableOpacity
+            style={[styles.toggleButton, !isEvent && !isComparing && styles.activeToggle]}
+            onPress={() => {
+              setIsEvent(false);
+              setIsComparing(false);
+            }}
+          >
+            <Text style={styles.toggleText}>Class</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.toggleButton, isEvent && !isComparing && styles.activeToggle]}
+            onPress={() => {
+              setIsEvent(true);
+              setIsComparing(false);
+            }}
+          >
+            <Text style={styles.toggleText}>Event</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.toggleButton, isComparing && styles.activeToggle]}
+            onPress={() => {
+              setIsComparing(true);
+              setIsEvent(false);
+            }}
+          >
+            <Text style={styles.toggleText}>Compare</Text>
+          </TouchableOpacity>
+        </View>
 
-          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-            <View style={styles.content}>
-              {/* Calendar */}
-              <Animatable.View animation="fadeInUp" style={styles.calendarContainer}>
-                <MonthCalendar
-                  selectedDay={selectedDate ? new Date(selectedDate) : undefined}
-                  onDayPress={handleDayPress}
-                  markedDays={getMarkedDates()}
-                  theme={{
-                    calendarBackground: '#fff0fa',
-                    monthTitleColor: '#6e3abf',
-                    dayContainerSize: 32,
-                    daySelectedBgColor: { value: '#a259c6' },
-                    daySelectedColor: { value: '#ffffff' },
-                    todayTextColor: '#ff69b4',
-                    dayTextColor: '#6e3abf',
-                    dayDisabledOpacity: 0.4,
-                    dayDotSize: 4,
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <View style={styles.content}>
+            {/* Calendar */}
+            <Animatable.View animation="fadeInUp" style={styles.calendarContainer}>
+              {/* Custom Month Title with Navigation */}
+              <View style={styles.calendarHeader}>
+                <TouchableOpacity 
+                  style={styles.monthNavButton}
+                  onPress={() => {
+                    const prevMonth = new Date(currentMonth);
+                    prevMonth.setMonth(prevMonth.getMonth() - 1);
+                    setCurrentMonth(prevMonth);
                   }}
-                />
-              </Animatable.View>
+                >
+                  <Text style={styles.monthNavButtonText}>‹</Text>
+                </TouchableOpacity>
+                
+                <Text style={styles.calendarMonthTitle}>
+                  {currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                </Text>
+                
+                <TouchableOpacity 
+                  style={styles.monthNavButton}
+                  onPress={() => {
+                    const nextMonth = new Date(currentMonth);
+                    nextMonth.setMonth(nextMonth.getMonth() + 1);
+                    setCurrentMonth(nextMonth);
+                  }}
+                >
+                  <Text style={styles.monthNavButtonText}>›</Text>
+                </TouchableOpacity>
+              </View>
+              
+              <Calendar
+                height={350}
+                events={allClassesFull
+                  .filter(item => item.creator === currentUser && !item.isShared)
+                  .map(item => {
+                    if (item.isRecurring) {
+                      // For recurring classes, create events for the current month
+                      const events = [];
+                      const semesterDates = getSemesterDates(item.semester);
+                      const currentMonthStart = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
+                      const currentMonthEnd = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
+                      
+                      // Find all occurrences in the current month
+                      let currentDate = new Date(Math.max(semesterDates.start, currentMonthStart));
+                      while (currentDate <= Math.min(semesterDates.end, currentMonthEnd)) {
+                        if (currentDate.getDay() === item.day) {
+                          const [hour, minute] = item.startTime.split(':').map(Number);
+                          const startTime = new Date(currentDate);
+                          startTime.setHours(hour, minute, 0, 0);
+                          
+                          const [endHour, endMinute] = item.endTime.split(':').map(Number);
+                          const endTime = new Date(currentDate);
+                          endTime.setHours(endHour, endMinute, 0, 0);
+                          
+                          events.push({
+                            title: item.name,
+                            start: startTime,
+                            end: endTime,
+                            color: item.isEvent ? '#ff69b4' : '#a259c6',
+                            id: `${item.id}-${currentDate.toISOString().split('T')[0]}`,
+                          });
+                        }
+                        currentDate.setDate(currentDate.getDate() + 1);
+                      }
+                      return events;
+                    } else {
+                      // For one-time events
+                      return [{
+                        title: item.name,
+                        start: new Date(item.date + 'T' + item.startTime),
+                        end: new Date(item.date + 'T' + item.endTime),
+                        color: item.isEvent ? '#ff69b4' : '#a259c6',
+                        id: item.id,
+                      }];
+                    }
+                  })
+                  .flat()}
+                mode="month"
+                date={currentMonth}
+                onPressEvent={event => {
+                  // Extract the original date from the event ID or start time
+                  const eventDate = event.start.toISOString().split('T')[0];
+                  setSelectedDate(eventDate);
+                }}
+                onPressCell={date => {
+                  // Fix timezone issue by using local date
+                  const localDate = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
+                  const dateString = localDate.toISOString().split('T')[0];
+                  setSelectedDate(dateString);
+                }}
+                onPressDateHeader={date => {
+                  // Fix timezone issue by using local date
+                  const localDate = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
+                  const dateString = localDate.toISOString().split('T')[0];
+                  setSelectedDate(dateString);
+                }}
+                onMonthChange={date => {
+                  setCurrentMonth(date);
+                }}
+                theme={{
+                  palette: {
+                    primary: '#a259c6',
+                    secondary: '#ff69b4',
+                  },
+                  eventCellOverlappings: [
+                    { main: '#a259c6', others: '#ffb6c1' },
+                  ],
+                  header: {
+                    dayHeader: {
+                      fontWeight: 'bold',
+                      color: '#6e3abf',
+                    },
+                    monthHeader: {
+                      fontWeight: 'bold',
+                      color: '#6e3abf',
+                      fontSize: 16,
+                    },
+                  },
+                }}
+              />
+            </Animatable.View>
 
-              {/* Add Form - Only show in Class and Event tabs */}
-              {!isComparing && (
-                <Animatable.View animation="fadeInUp" delay={100} style={styles.eventCard}>
-                  <Text style={styles.eventCardTitle}>
-                    {isEvent ? 'Add New Event' : 'Add New Class'}
-                  </Text>
-                  {!isEvent && (
-                    <View style={styles.inputContainer}>
-                      <Text style={styles.inputLabel}>Class Name</Text>
-                      <TextInput
-                        style={styles.input}
-                        value={className}
-                        onChangeText={setClassName}
-                        placeholder="Enter class name"
-                        placeholderTextColor="#d1b3ff"
-                      />
-                    </View>
-                  )}
-                  {isEvent && (
-                    <View style={styles.inputContainer}>
-                      <Text style={styles.inputLabel}>Event Description</Text>
-                      <TextInput
-                        style={styles.input}
-                        value={eventDescription}
-                        onChangeText={setEventDescription}
-                        placeholder="Enter event description"
-                        placeholderTextColor="#d1b3ff"
-                      />
-                    </View>
-                  )}
-                  <View style={[styles.timeContainer, { zIndex: 6 }]}>
-                    <View style={styles.timeInput}>
-                      <Text style={styles.inputLabel}>Start Time</Text>
-                      <View style={styles.timeRowContainer}>
-                        <DropDownPicker
-                          open={startHourOpen}
-                          value={startTimeHour}
-                          items={Array.from({ length: 12 }, (_, i) => ({ label: `${i + 1}`, value: `${i + 1}` }))}
-                          setOpen={setStartHourOpen}
-                          setValue={setStartTimeHour}
-                          placeholder="Hr"
-                          containerStyle={{ flex: 1, marginRight: 5 }}
-                          style={styles.picker}
-                          dropDownContainerStyle={styles.pickerDropdown}
-                          textStyle={styles.pickerText}
-                          listMode="SCROLLVIEW"
-                        />
-                        <DropDownPicker
-                          open={startMinuteOpen}
-                          value={startTimeMinute}
-                          items={[
-                            { label: '00', value: '00' },
-                            { label: '15', value: '15' },
-                            { label: '30', value: '30' },
-                            { label: '45', value: '45' },
-                          ]}
-                          setOpen={setStartMinuteOpen}
-                          setValue={setStartTimeMinute}
-                          placeholder="Min"
-                          containerStyle={{ flex: 1, marginRight: 5 }}
-                          style={styles.picker}
-                          dropDownContainerStyle={styles.pickerDropdown}
-                          textStyle={styles.pickerText}
-                          listMode="SCROLLVIEW"
-                        />
-                        <DropDownPicker
-                          open={startAmPmOpen}
-                          value={startTimeAmPm}
-                          items={[{ label: 'AM', value: 'AM' }, { label: 'PM', value: 'PM' }]}
-                          setOpen={setStartAmPmOpen}
-                          setValue={setStartTimeAmPm}
-                          placeholder="AM/PM"
-                          containerStyle={{ flex: 1 }}
-                          style={styles.picker}
-                          dropDownContainerStyle={styles.pickerDropdown}
-                          textStyle={styles.pickerText}
-                          listMode="SCROLLVIEW"
-                        />
-                      </View>
-                    </View>
-                  </View>
-                  <View style={[styles.timeContainer, { zIndex: 5 }]}>
-                    <View style={styles.timeInput}>
-                      <Text style={styles.inputLabel}>End Time</Text>
-                      <View style={styles.timeRowContainer}>
-                        <DropDownPicker
-                          open={endHourOpen}
-                          value={endTimeHour}
-                          items={Array.from({ length: 12 }, (_, i) => ({ label: `${i + 1}`, value: `${i + 1}` }))}
-                          setOpen={setEndHourOpen}
-                          setValue={setEndTimeHour}
-                          placeholder="Hr"
-                          containerStyle={{ flex: 1, marginRight: 5 }}
-                          style={styles.picker}
-                          dropDownContainerStyle={styles.pickerDropdown}
-                          textStyle={styles.pickerText}
-                          listMode="SCROLLVIEW"
-                        />
-                        <DropDownPicker
-                          open={endMinuteOpen}
-                          value={endTimeMinute}
-                          items={[
-                            { label: '00', value: '00' },
-                            { label: '15', value: '15' },
-                            { label: '30', value: '30' },
-                            { label: '45', value: '45' },
-                          ]}
-                          setOpen={setEndMinuteOpen}
-                          setValue={setEndTimeMinute}
-                          placeholder="Min"
-                          containerStyle={{ flex: 1, marginRight: 5 }}
-                          style={styles.picker}
-                          dropDownContainerStyle={styles.pickerDropdown}
-                          textStyle={styles.pickerText}
-                          listMode="SCROLLVIEW"
-                        />
-                        <DropDownPicker
-                          open={endAmPmOpen}
-                          value={endTimeAmPm}
-                          items={[{ label: 'AM', value: 'AM' }, { label: 'PM', value: 'PM' }]}
-                          setOpen={setEndAmPmOpen}
-                          setValue={setEndTimeAmPm}
-                          placeholder="AM/PM"
-                          containerStyle={{ flex: 1 }}
-                          style={styles.picker}
-                          dropDownContainerStyle={styles.pickerDropdown}
-                          textStyle={styles.pickerText}
-                          listMode="SCROLLVIEW"
-                        />
-                      </View>
-                    </View>
-                  </View>
-                  {!isEvent && (
-                    <>
-                      <View style={[styles.inputContainer, { zIndex: 4 }]}>
-                        <Text style={styles.inputLabel}>Semester</Text>
-                        <DropDownPicker
-                          open={semesterOpen}
-                          value={semester}
-                          items={[
-                            { label: 'Fall 2025', value: 'Fall 2025' },
-                            { label: 'Spring 2026', value: 'Spring 2026' }
-                          ]}
-                          setOpen={setSemesterOpen}
-                          setValue={setSemester}
-                          listMode="SCROLLVIEW"
-                          style={styles.picker}
-                          dropDownContainerStyle={styles.pickerDropdown}
-                          textStyle={styles.pickerText}
-                        />
-                      </View>
-                      <View style={[styles.inputContainer, { zIndex: 3 }]}>
-                        <Text style={styles.inputLabel}>Day of Week</Text>
-                        <DropDownPicker
-                          open={dayOpen}
-                          value={day}
-                          items={days}
-                          setOpen={setDayOpen}
-                          setValue={setDay}
-                          listMode="SCROLLVIEW"
-                          style={styles.picker}
-                          dropDownContainerStyle={styles.pickerDropdown}
-                          textStyle={styles.pickerText}
-                        />
-                      </View>
-                    </>
-                  )}
-                  <TouchableOpacity 
-                    style={styles.addButton}
-                    onPress={handleAddClass}
-                  >
-                    <Text style={styles.addButtonText}>
-                      {isEvent ? 'Add Event' : 'Add Class'}
-                    </Text>
-                  </TouchableOpacity>
-                </Animatable.View>
-              )}
-
-              {/* Daily Schedule */}
-              {!isComparing && (
-                <Animatable.View animation="fadeInUp" delay={200} style={styles.dailySchedule}>
-                  <Text style={styles.dailyTitle}>
-                    Your Schedule for {selectedDate ? new Date(selectedDate + 'T00:00:00').toLocaleDateString() : 'Selected Day'}
-                  </Text>
-                  {getDailySchedule().length > 0 ? (
-                    <FlatList
-                      data={getDailySchedule()}
-                      renderItem={renderDailyItem}
-                      keyExtractor={item => item.id}
-                      style={styles.dailyList}
+            {/* Add Form - Only show in Class and Event tabs */}
+            {!isComparing && (
+              <Animatable.View animation="fadeInUp" delay={100} style={styles.eventCard}>
+                <Text style={styles.eventCardTitle}>
+                  {isEvent ? 'Add New Event' : 'Add New Class'}
+                </Text>
+                {!isEvent && (
+                  <View style={styles.inputContainer}>
+                    <Text style={styles.inputLabel}>Class Name</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={className}
+                      onChangeText={setClassName}
+                      placeholder="Enter class name"
+                      placeholderTextColor="#d1b3ff"
                     />
-                  ) : (
-                    <Text style={styles.noScheduleText}>
-                      No schedule for this day
-                    </Text>
-                  )}
-                </Animatable.View>
-              )}
+                  </View>
+                )}
+                {isEvent && (
+                  <View style={styles.inputContainer}>
+                    <Text style={styles.inputLabel}>Event Description</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={eventDescription}
+                      onChangeText={setEventDescription}
+                      placeholder="Enter event description"
+                      placeholderTextColor="#d1b3ff"
+                    />
+                  </View>
+                )}
+                <View style={[styles.timeContainer, { zIndex: 6 }]}>
+                  <View style={styles.timeInput}>
+                    <Text style={styles.inputLabel}>Start Time</Text>
+                    <View style={styles.timeRowContainer}>
+                      <DropDownPicker
+                        open={startHourOpen}
+                        value={startTimeHour}
+                        items={Array.from({ length: 12 }, (_, i) => ({ label: `${i + 1}`, value: `${i + 1}` }))}
+                        setOpen={setStartHourOpen}
+                        setValue={setStartTimeHour}
+                        placeholder="Hr"
+                        containerStyle={{ flex: 1, marginRight: 5 }}
+                        style={styles.picker}
+                        dropDownContainerStyle={styles.pickerDropdown}
+                        textStyle={styles.pickerText}
+                        listMode="SCROLLVIEW"
+                      />
+                      <DropDownPicker
+                        open={startMinuteOpen}
+                        value={startTimeMinute}
+                        items={[
+                          { label: '00', value: '00' },
+                          { label: '15', value: '15' },
+                          { label: '30', value: '30' },
+                          { label: '45', value: '45' },
+                        ]}
+                        setOpen={setStartMinuteOpen}
+                        setValue={setStartTimeMinute}
+                        placeholder="Min"
+                        containerStyle={{ flex: 1, marginRight: 5 }}
+                        style={styles.picker}
+                        dropDownContainerStyle={styles.pickerDropdown}
+                        textStyle={styles.pickerText}
+                        listMode="SCROLLVIEW"
+                      />
+                      <DropDownPicker
+                        open={startAmPmOpen}
+                        value={startTimeAmPm}
+                        items={[{ label: 'AM', value: 'AM' }, { label: 'PM', value: 'PM' }]}
+                        setOpen={setStartAmPmOpen}
+                        setValue={setStartTimeAmPm}
+                        placeholder="AM/PM"
+                        containerStyle={{ flex: 1 }}
+                        style={styles.picker}
+                        dropDownContainerStyle={styles.pickerDropdown}
+                        textStyle={styles.pickerText}
+                        listMode="SCROLLVIEW"
+                      />
+                    </View>
+                  </View>
+                </View>
+                <View style={[styles.timeContainer, { zIndex: 5 }]}>
+                  <View style={styles.timeInput}>
+                    <Text style={styles.inputLabel}>End Time</Text>
+                    <View style={styles.timeRowContainer}>
+                      <DropDownPicker
+                        open={endHourOpen}
+                        value={endTimeHour}
+                        items={Array.from({ length: 12 }, (_, i) => ({ label: `${i + 1}`, value: `${i + 1}` }))}
+                        setOpen={setEndHourOpen}
+                        setValue={setEndTimeHour}
+                        placeholder="Hr"
+                        containerStyle={{ flex: 1, marginRight: 5 }}
+                        style={styles.picker}
+                        dropDownContainerStyle={styles.pickerDropdown}
+                        textStyle={styles.pickerText}
+                        listMode="SCROLLVIEW"
+                      />
+                      <DropDownPicker
+                        open={endMinuteOpen}
+                        value={endTimeMinute}
+                        items={[
+                          { label: '00', value: '00' },
+                          { label: '15', value: '15' },
+                          { label: '30', value: '30' },
+                          { label: '45', value: '45' },
+                        ]}
+                        setOpen={setEndMinuteOpen}
+                        setValue={setEndTimeMinute}
+                        placeholder="Min"
+                        containerStyle={{ flex: 1, marginRight: 5 }}
+                        style={styles.picker}
+                        dropDownContainerStyle={styles.pickerDropdown}
+                        textStyle={styles.pickerText}
+                        listMode="SCROLLVIEW"
+                      />
+                      <DropDownPicker
+                        open={endAmPmOpen}
+                        value={endTimeAmPm}
+                        items={[{ label: 'AM', value: 'AM' }, { label: 'PM', value: 'PM' }]}
+                        setOpen={setEndAmPmOpen}
+                        setValue={setEndTimeAmPm}
+                        placeholder="AM/PM"
+                        containerStyle={{ flex: 1 }}
+                        style={styles.picker}
+                        dropDownContainerStyle={styles.pickerDropdown}
+                        textStyle={styles.pickerText}
+                        listMode="SCROLLVIEW"
+                      />
+                    </View>
+                  </View>
+                </View>
+                {!isEvent && (
+                  <>
+                    <View style={[styles.inputContainer, { zIndex: 4 }]}>
+                      <Text style={styles.inputLabel}>Semester</Text>
+                      <DropDownPicker
+                        open={semesterOpen}
+                        value={semester}
+                        items={[
+                          { label: 'Fall 2025', value: 'Fall 2025' },
+                          { label: 'Spring 2026', value: 'Spring 2026' }
+                        ]}
+                        setOpen={setSemesterOpen}
+                        setValue={setSemester}
+                        listMode="SCROLLVIEW"
+                        style={styles.picker}
+                        dropDownContainerStyle={styles.pickerDropdown}
+                        textStyle={styles.pickerText}
+                      />
+                    </View>
+                    <View style={[styles.inputContainer, { zIndex: 3 }]}>
+                      <Text style={styles.inputLabel}>Day of Week</Text>
+                      <DropDownPicker
+                        open={dayOpen}
+                        value={day}
+                        items={days}
+                        setOpen={setDayOpen}
+                        setValue={setDay}
+                        listMode="SCROLLVIEW"
+                        style={styles.picker}
+                        dropDownContainerStyle={styles.pickerDropdown}
+                        textStyle={styles.pickerText}
+                      />
+                    </View>
+                  </>
+                )}
+                <TouchableOpacity 
+                  style={styles.addButton}
+                  onPress={handleAddClass}
+                >
+                  <Text style={styles.addButtonText}>
+                    {isEvent ? 'Add Event' : 'Add Class'}
+                  </Text>
+                </TouchableOpacity>
+              </Animatable.View>
+            )}
 
-              {/* Group Schedule View */}
-              {isComparing && selectedDate && (
-                <Animatable.View animation="fadeInUp" delay={200} style={[styles.groupScheduleContainer, { position: 'relative' }]}> 
-                  <Text style={styles.dailyTitle}>Group Schedule for {new Date(selectedDate).toLocaleDateString()}</Text>
+            {/* Daily Schedule */}
+            {!isComparing && (
+              <Animatable.View animation="fadeInUp" delay={200} style={styles.dailySchedule}>
+                <Text style={styles.dailyTitle}>
+                  Your Schedule for {selectedDate ? new Date(selectedDate + 'T00:00:00').toLocaleDateString() : 'Selected Day'}
+                </Text>
+                {console.log('dailyClasses state:', dailyClasses)}
+                {dailyClasses.length > 0 ? (
+                  <ScrollView
+                    style={styles.dailyList}
+                    showsVerticalScrollIndicator={true}
+                    nestedScrollEnabled={true}
+                    scrollEnabled={true}
+                  >
+                    {dailyClasses.map((item, index) => (
+                      <View key={item.id || index}>
+                        {renderDailyItem({ item })}
+                      </View>
+                    ))}
+                  </ScrollView>
+                ) : (
+                  <Text style={styles.noScheduleText}>
+                    No schedule for this day
+                  </Text>
+                )}
+              </Animatable.View>
+            )}
+
+            {/* Group Schedule View */}
+            {isComparing && (
+              <Animatable.View animation="fadeInUp" delay={200} style={[styles.groupScheduleContainer, { position: 'relative' }]}> 
+                <Text style={styles.dailyTitle}>
+                  Group Schedule {selectedDate ? `for ${new Date(selectedDate).toLocaleDateString()}` : '(Select a date)'}
+                </Text>
+                {!selectedDate && (
+                  <Text style={styles.noScheduleText}>Please select a date from the calendar above to view the group schedule</Text>
+                )}
+                {selectedDate && (
                   <View style={styles.compareContainer}>
                     <ScrollView
-                      horizontal
-                      ref={groupScrollRef}
-                      showsHorizontalScrollIndicator={false}
-                      style={styles.horizontalScroll}
+                      ref={(ref) => setTimeListRef(ref)}
+                      showsVerticalScrollIndicator={true}
+                      style={styles.timeTableScroll}
+                      nestedScrollEnabled={true}
+                      scrollEnabled={true}
+                      onScroll={(event) => {
+                        setCurrentScrollY(event.nativeEvent.contentOffset.y);
+                      }}
+                      scrollEventThrottle={16}
                     >
-                      <ScrollView
-                        ref={groupVerticalScrollRef}
-                        showsVerticalScrollIndicator={true}
-                        style={styles.verticalScroll}
-                      >
-                        <View style={styles.compareTable}>
-                          <View style={styles.groupHeaderRow}>
-                            <Text style={styles.timeSlotHeader}>Time</Text>
-                            {users.map(user => <Text key={user} style={styles.userHeader}>{user}</Text>)}
-                          </View>
-                          {generateTimeSlots().map(time => (
-                            <View key={time} style={styles.groupRow}>
-                              <Text style={styles.timeSlot}>{time}</Text>
-                              {users.map(user => (
-                                <Text key={user} style={[styles.scheduleCell, getEventForUserAtTime(user, time) !== 'Free' && styles.busyCell]}>
+                      {/* Time Slots */}
+                      {generateTimeSlots().map((time, index) => (
+                        <View key={time} style={styles.timeSlotContainer}>
+                          <Text style={styles.timeSlotLabel}>{time}</Text>
+                          <View style={styles.usersRow}>
+                            {users.map(user => (
+                              <View key={user} style={styles.userCell}>
+                                <Text style={styles.userName}>{user}</Text>
+                                <Text style={[styles.userSchedule, getEventForUserAtTime(user, time) !== 'Free' && styles.busyCell]}>
                                   {getEventForUserAtTime(user, time)}
                                 </Text>
-                              ))}
-                            </View>
-                          ))}
+                              </View>
+                            ))}
+                          </View>
                         </View>
-                      </ScrollView>
+                      ))}
                     </ScrollView>
-                  </View>
-                  
-                  {/* Navigation Control Panel */}
-                  <View style={styles.navigationPanel}>
-                    {/* Horizontal Navigation */}
-                    <View style={styles.horizontalNav}>
-                      <TouchableOpacity
-                        style={styles.navButton}
-                        onPress={() => {
-                          if (groupScrollRef.current) {
-                            groupScrollRef.current.scrollTo({ x: 0, animated: true });
-                          }
-                        }}
-                      >
-                        <Text style={styles.navButtonText}>◀</Text>
-                      </TouchableOpacity>
-                      <Text style={styles.navLabel}>Users</Text>
-                      <TouchableOpacity
-                        style={styles.navButton}
-                        onPress={() => {
-                          if (groupScrollRef.current) {
-                            groupScrollRef.current.scrollTo({ x: 1000, animated: true });
-                          }
-                        }}
-                      >
-                        <Text style={styles.navButtonText}>▶</Text>
-                      </TouchableOpacity>
-                    </View>
                     
-                    {/* Vertical Navigation */}
-                    <View style={styles.verticalNav}>
+                    {/* Scroll Navigation Buttons */}
+                    <View style={styles.scrollNavigation}>
                       <TouchableOpacity
-                        style={styles.navButton}
+                        style={styles.scrollButton}
                         onPress={() => {
-                          if (groupVerticalScrollRef.current) {
-                            const newOffset = Math.max(0, verticalScrollOffset.current - timeSlotHeight * slotsPerPage);
-                            verticalScrollOffset.current = newOffset;
-                            groupVerticalScrollRef.current.scrollTo({ y: newOffset, animated: true });
+                          if (timeListRef) {
+                            // Scroll up slowly by 300 pixels from current position
+                            const newY = Math.max(0, currentScrollY - 300);
+                            timeListRef.scrollTo({ y: newY, animated: true });
                           }
                         }}
                       >
-                        <Text style={styles.navButtonText}>▲</Text>
+                        <Text style={styles.scrollButtonText}>▲</Text>
                       </TouchableOpacity>
-                      <Text style={styles.navLabel}>Time</Text>
                       <TouchableOpacity
-                        style={styles.navButton}
+                        style={styles.scrollButton}
                         onPress={() => {
-                          if (groupVerticalScrollRef.current) {
-                            const totalSlots = generateTimeSlots().length;
-                            const maxScroll = Math.max(0, (totalSlots - slotsPerPage) * timeSlotHeight);
-                            const newOffset = Math.min(maxScroll, verticalScrollOffset.current + timeSlotHeight * slotsPerPage);
-                            verticalScrollOffset.current = newOffset;
-                            groupVerticalScrollRef.current.scrollTo({ y: newOffset, animated: true });
+                          if (timeListRef) {
+                            // Scroll down slowly by 300 pixels from current position
+                            const newY = currentScrollY + 300;
+                            timeListRef.scrollTo({ y: newY, animated: true });
                           }
                         }}
                       >
-                        <Text style={styles.navButtonText}>▼</Text>
+                        <Text style={styles.scrollButtonText}>▼</Text>
                       </TouchableOpacity>
                     </View>
                   </View>
-                </Animatable.View>
-              )}
-            </View>
-          </TouchableWithoutFeedback>
-        </ScrollView>
-      </SafeAreaView>
+                )}
+              </Animatable.View>
+            )}
+          </View>
+        </TouchableWithoutFeedback>
+      </ScrollView>
       <HelpOverlay 
         visible={showHelp} 
         tab="schedule" 
@@ -1021,20 +1388,21 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingHorizontal: 16,
-    paddingTop: 12,
+    paddingTop: 0,
     backgroundColor: 'transparent',
   },
   scrollContainer: {
     paddingHorizontal: 16,
-    paddingBottom:80,
+    paddingBottom: 80,
     backgroundColor: 'transparent',
+    minHeight: '100%',
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 6,
+    paddingVertical: 4,
     backgroundColor: '#fff0fa',
   },
   starIcon: {
@@ -1169,18 +1537,15 @@ const styles = StyleSheet.create({
     elevation: 3,
     backgroundColor: '#fff0fa',
     borderWidth: 1,
-    borderColor: '#d1b3ff'
+    borderColor: '#d1b3ff',
+    height: 420, // Fixed height to ensure calendar is visible
   },
   deleteButton: {
-    backgroundColor: 'transparent',
-    paddingHorizontal: 6,
-    paddingVertical: 4,
-    borderRadius: 10,
-    minWidth: 0,
-    minHeight: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-    alignSelf: 'center',
+    padding: 5,
+    borderRadius: 8,
+    backgroundColor: '#ffe6e6',
+    borderWidth: 1,
+    borderColor: '#ff6b6b',
   },
   deleteAllButton: {
     backgroundColor: '#ff6b6b',
@@ -1191,6 +1556,33 @@ const styles = StyleSheet.create({
     borderColor: '#ff4757',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  debugButton: {
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    borderColor: '#45a049',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  debugShowButton: {
+    backgroundColor: '#2196F3',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    borderColor: '#1976D2',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  debugButtonText: {
+    fontFamily: 'PressStart2P',
+    fontSize: 6,
+    color: '#fff',
   },
   deleteButtonText: {
     fontFamily: 'PressStart2P',
@@ -1280,6 +1672,19 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 12,
     marginBottom: 10,
+    backgroundColor: '#fff0fa',
+    borderWidth: 2,
+    borderColor: '#d1b3ff',
+    shadowColor: '#a259c6',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  dailyItemContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   dailyItemHeader: {
     flexDirection: 'row',
@@ -1315,6 +1720,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 6,
     elevation: 4,
+    minHeight: 150,
+    maxHeight: 400,
+    borderWidth: 2,
+    borderColor: '#d1b3ff',
+    zIndex: 1000,
   },
   dailyTitle: {
     fontSize: 18,
@@ -1323,7 +1733,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   dailyList: {
-    marginTop: 10,
+    minHeight: 100,
   },
   shareButton: {
     backgroundColor: '#6e3abf',
@@ -1405,55 +1815,57 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 6,
     elevation: 4,
-    height: Dimensions.get('window').height * 0.7,
+    height: Dimensions.get('window').height * 0.75,
     marginBottom: 20,
+    overflow: 'hidden', // Prevent overflow
   },
-  groupHeaderRow: {
-    flexDirection: 'row',
-    borderBottomWidth: 2,
+  compareContainer: {
+    flex: 1,
+    minHeight: 200,
+    overflow: 'hidden',
+  },
+  timeTableScroll: {
+    flex: 1,
+  },
+  timeSlotContainer: {
+    padding: 10,
+    borderBottomWidth: 1,
     borderBottomColor: '#d1b3ff',
-    paddingBottom: 8,
-    paddingTop: 5,
-    backgroundColor: '#f8f0ff',
+    backgroundColor: '#fff',
+    marginBottom: 2,
     borderRadius: 8,
-    marginBottom: 5,
   },
-  timeSlotHeader: {
-    width: 70,
+  timeSlotLabel: {
     fontWeight: 'bold',
     color: '#6e3abf',
     fontFamily: 'PressStart2P',
     fontSize: 10,
-  },
-  userHeader: {
-    width: 140,
-    fontWeight: 'bold',
+    marginBottom: 8,
     textAlign: 'center',
-    color: '#6e3abf',
-    fontFamily: 'PressStart2P',
-    fontSize: 8,
   },
-  groupRow: {
+  usersRow: {
     flexDirection: 'row',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e9d6ff',
-    minHeight: 35,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    flexWrap: 'wrap',
   },
-  timeSlot: {
-    width: 70,
-    color: '#a259c6',
+  userCell: {
+    flex: 1,
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
+  userName: {
     fontFamily: 'PressStart2P',
     fontSize: 8,
-    textAlign: 'center',
+    color: '#6e3abf',
+    fontWeight: 'bold',
+    marginBottom: 2,
   },
-  scheduleCell: {
-    width: 140,
-    textAlign: 'center',
-    color: '#7a58b8',
+  userSchedule: {
     fontFamily: 'PressStart2P',
     fontSize: 7,
-    paddingHorizontal: 2,
+    color: '#7a58b8',
+    textAlign: 'center',
   },
   busyCell: {
     fontWeight: 'bold',
@@ -1467,55 +1879,6 @@ const styles = StyleSheet.create({
     height: 16,
     marginLeft: 4,
   },
-  scrollButton: {
-    backgroundColor: '#d1b3ff',
-    borderRadius: 20,
-    padding: 10,
-    marginHorizontal: 5,
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 2,
-  },
-  scrollButtonText: {
-    fontSize: 18,
-    color: '#6e3abf',
-    fontWeight: 'bold',
-    fontFamily: 'PressStart2P',
-  },
-  scrollToBottomButton: {
-    position: 'absolute',
-    right: 16,
-    bottom: 16,
-    backgroundColor: '#a259c6',
-    borderRadius: 24,
-    width: 48,
-    height: 48,
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 4,
-    shadowColor: '#6e3abf',
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-  },
-  scrollToBottomText: {
-    color: '#fff',
-    fontSize: 28,
-    fontWeight: 'bold',
-    fontFamily: 'PressStart2P',
-    textAlign: 'center',
-    marginTop: -2,
-  },
-  decorativeContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    overflow: 'hidden',
-  },
-  decorativeIcon: {
-    position: 'absolute',
-  },
   headerButtons: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1528,55 +1891,74 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
   },
-  compareContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  horizontalScroll: {
-    flex: 1,
-  },
-  verticalScroll: {
-    flex: 1,
-  },
-  compareTable: {
-    paddingBottom: 20,
-  },
-  navigationPanel: {
+  scrollNavigation: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 10,
-    marginBottom: 20,
-    paddingHorizontal: 10,
-  },
-  horizontalNav: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  navButton: {
     padding: 10,
-    marginHorizontal: 5,
+  },
+  scrollButton: {
+    padding: 10,
     borderRadius: 20,
     backgroundColor: '#e9d6ff',
     borderWidth: 2,
     borderColor: '#d1b3ff',
-    minWidth: 40,
   },
-  navButtonText: {
+  scrollButtonText: {
+    fontFamily: 'PressStart2P',
+    fontSize: 12,
+    color: '#6e3abf',
+  },
+  calendarMonthTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#6e3abf',
+    fontFamily: 'PressStart2P',
+    textAlign: 'center',
+    backgroundColor: '#f8f0ff',
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: '#d1b3ff',
+    shadowColor: '#a259c6',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  monthNavButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: '#e9d6ff',
+    borderWidth: 2,
+    borderColor: '#d1b3ff',
+    minWidth: 35,
+    minHeight: 35,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#a259c6',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  monthNavButtonText: {
     fontSize: 18,
     color: '#6e3abf',
     fontWeight: 'bold',
     fontFamily: 'PressStart2P',
+    textAlign: 'center',
   },
-  navLabel: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#6e3abf',
-    fontFamily: 'PressStart2P',
-  },
-  verticalNav: {
+  calendarHeader: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 15,
+    backgroundColor: '#fff',
+    borderRadius: 15,
+    marginBottom: 10,
   },
 });
 

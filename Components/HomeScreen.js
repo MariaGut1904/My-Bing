@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, Image, ImageBackground, TouchableOpacity, ScrollView, Alert, Modal, TextInput, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTasks } from './TaskContext';
@@ -19,37 +19,8 @@ const HomeScreen = ({ navigation }) => {
   const [showHelp, setShowHelp] = useState(false);
   const [avatarLoaded, setAvatarLoaded] = useState(false);
 
-  // Debug logging
-  console.log('HomeScreen currentUser:', currentUser);
-
-  useEffect(() => {
-    console.log('HomeScreen render start:', Date.now());
-    return () => {
-      console.log('HomeScreen render end:', Date.now());
-    };
-  }, []);
-
-  const handleLogout = async () => {
-    try {
-      await logout();
-      navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
-      resetTasks();
-      resetSchedule();
-      resetBudget();
-    } catch (error) {
-      console.error('Logout error:', error);
-    }
-  };
-
-  // Get today's date in a nice format
-  const getTodayDate = () => {
-    const today = new Date();
-    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-    return today.toLocaleDateString('en-US', options);
-  };
-
-  // Filter events for today only
-  const getTodayEvents = () => {
+  // Memoize expensive calculations
+  const todayEvents = React.useMemo(() => {
     const today = new Date();
     const todayStr = today.toISOString().split('T')[0];
     const todayDay = today.getDay();
@@ -66,12 +37,10 @@ const HomeScreen = ({ navigation }) => {
       }
       return false;
     });
-  };
+  }, [schedule, currentUser]);
 
-  const todayEvents = getTodayEvents();
-
-  // Count today's classes
-  const getTodayClassesCount = () => {
+  // Memoize today's classes count
+  const todayClassesCount = React.useMemo(() => {
     const today = new Date();
     const todayStr = today.toISOString().split('T')[0];
     const todayDay = today.getDay();
@@ -89,6 +58,25 @@ const HomeScreen = ({ navigation }) => {
       }
       return false;
     }).length;
+  }, [schedule, currentUser]);
+
+  // Memoize today's date
+  const todayDate = React.useMemo(() => {
+    const today = new Date();
+    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+    return today.toLocaleDateString('en-US', options);
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
+      resetTasks();
+      resetSchedule();
+      resetBudget();
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
   };
 
   const handleAddTask = () => {
@@ -167,7 +155,7 @@ const HomeScreen = ({ navigation }) => {
               />
             </Animatable.View>
             <Text style={styles.welcomeText}>Welcome back, {currentUser || 'User'}</Text>
-            <Text style={styles.dateText}>{getTodayDate()}</Text>
+            <Text style={styles.dateText}>{todayDate}</Text>
           </Animatable.View>
 
           {/* Quick Stats Section */}
@@ -186,7 +174,7 @@ const HomeScreen = ({ navigation }) => {
               </View>
               <View style={styles.statItem}>
                 <Image source={require('../assets/cat-face.gif')} style={styles.statIcon} />
-                <Text style={styles.statValue}>{getTodayClassesCount()}</Text>
+                <Text style={styles.statValue}>{todayClassesCount}</Text>
                 <Text style={styles.statLabel}>Classes</Text>
               </View>
             </View>

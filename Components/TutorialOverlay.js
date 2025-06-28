@@ -48,7 +48,6 @@ export const TutorialOverlay = () => {
   }, [currentStep, currentTab, showTutorial, navigation]);
 
   if (!showTutorial) {
-    console.log('Tutorial not showing because showTutorial is false');
     return null;
   }
 

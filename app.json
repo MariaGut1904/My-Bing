@@ -2,7 +2,7 @@
   "expo": {
     "name": "My Bing!",
     "slug": "MyAwesomeApp",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -17,7 +17,10 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.maria.myawesomeapp",
-      "buildNumber": "1.0.0"
+      "buildNumber": "1.1.0",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -26,7 +29,11 @@
       },
       "edgeToEdgeEnabled": true,
       "package": "com.maria.myawesomeapp",
-      "versionCode": 1
+      "versionCode": 2,
+      "permissions": [
+        "INTERNET",
+        "ACCESS_NETWORK_STATE"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -45,6 +52,8 @@
     },
     "updates": {
       "url": "https://u.expo.dev/e0503142-8770-4848-9937-44611f9e66c9"
-    }
+    },
+    "owner": "mariagu19",
+    "privacy": "public"
   }
 }

@@ -7,6 +7,7 @@ const ScheduleContext = createContext();
 export const ScheduleProvider = ({ children }) => {
   const { currentUser } = useAuth();
   const [schedule, setSchedule] = useState([]);
+  const [allClasses, setAllClasses] = useState([]);
 
   // Load schedule for the current user
   useEffect(() => {
@@ -30,15 +31,11 @@ export const ScheduleProvider = ({ children }) => {
         const userSchedule = Array.from(uniqueClasses.values()).filter(cls => {
           const isUserClass = cls.creator === currentUser;
           const isShared = cls.isShared;
-          console.log('Loading class:', cls.name, 'creator:', cls.creator, 'isShared:', isShared, 'currentUser:', currentUser);
           return isUserClass || isShared;
         });
         
-        console.log('Loading schedule for user:', currentUser);
-        console.log('All classes:', Array.from(uniqueClasses.values()));
-        console.log('Filtered schedule:', userSchedule);
-        
         setSchedule(userSchedule);
+        setAllClasses(userSchedule);
       } catch (error) {
         console.error('Error loading schedule:', error);
       }
@@ -79,7 +76,6 @@ export const ScheduleProvider = ({ children }) => {
         
         // Save to AsyncStorage
         await AsyncStorage.setItem('allClasses', JSON.stringify(finalClasses));
-        console.log('Saved all classes:', finalClasses);
       } catch (error) {
         console.error('Error saving schedule:', error);
       }
@@ -88,7 +84,22 @@ export const ScheduleProvider = ({ children }) => {
   }, [schedule, currentUser]);
 
   const addEvent = (event) => {
-    setSchedule(prevSchedule => [...prevSchedule, { ...event, id: Date.now().toString() }]);
+    const newEvent = {
+      ...event,
+      id: Date.now().toString(),
+      creator: currentUser,
+      isShared: false
+    };
+    
+    const updatedSchedule = [...schedule, newEvent];
+    setSchedule(updatedSchedule);
+    
+    // Update the comprehensive list
+    const updatedAllClasses = [...allClasses, newEvent];
+    setAllClasses(updatedAllClasses);
+    
+    // Save to AsyncStorage
+    saveToStorage(updatedAllClasses);
   };
 
   const deleteEvent = (eventId) => {
@@ -101,6 +112,14 @@ export const ScheduleProvider = ({ children }) => {
 
   const resetSchedule = () => {
     setSchedule([]);
+  };
+
+  const saveToStorage = async (classes) => {
+    try {
+      await AsyncStorage.setItem('allClasses', JSON.stringify(classes));
+    } catch (error) {
+      console.error('Error saving classes to storage:', error);
+    }
   };
 
   return (
