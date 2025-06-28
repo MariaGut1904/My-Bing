@@ -649,7 +649,8 @@ const SchedulePlanner = () => {
   const generateTimeSlots = () => {
     const slots = [];
     const startHour = 8;
-    const endHour = 22; // 10 PM
+    const endHour = 23; // Extended to 11 PM to ensure we cover events ending at 3:00 PM
+    
     for (let hour = startHour; hour <= endHour; hour++) {
       for (let min = 0; min < 60; min += 15) {
         let displayHour = hour;
@@ -666,56 +667,56 @@ const SchedulePlanner = () => {
         }
         
         const minStr = min.toString().padStart(2, '0');
-        slots.push(`${displayHour}:${minStr} ${period}`);
+        const timeSlot = `${displayHour}:${minStr} ${period}`;
+        slots.push(timeSlot);
       }
     }
+    
     return slots;
   };
 
   // Helper to get event for a user at a specific 15-min interval
   const getEventForUserAtTime = (user, timeLabel) => {
     if (!selectedDate) return 'Free';
+    
     // Parse '8:15 AM', '12:00 PM', etc. to 24-hour time
     const [time, period] = timeLabel.split(' ');
     let [hour, minute] = time.split(':').map(Number);
-    if (period === 'PM' && hour !== 12) hour += 12;
-    if (period === 'AM' && hour === 12) hour = 0;
+    
+    // Fix the time conversion logic
+    if (period === 'PM' && hour !== 12) {
+      hour += 12;
+    } else if (period === 'AM' && hour === 12) {
+      hour = 0;
+    }
+    
     const slotStart = hour * 60 + minute;
     const slotEnd = slotStart + 15; // 15-minute slot
 
     const selectedDateObj = new Date(selectedDate + 'T00:00:00');
     const selectedDay = selectedDateObj.getDay();
 
-    console.log(`Looking for events for user ${user} at time ${timeLabel} (${slotStart}-${slotEnd}) on day ${selectedDay}`);
-    console.log(`Available items for ${user}:`, allClassesFull.filter(item => item.creator === user));
+    // Get all classes/events for this user on the selected date
+    const userItems = allClassesFull.filter(item => 
+      item.creator === user && 
+      item.date === selectedDate
+    );
 
-    const event = allClassesFull.find(item => {
-      // Find items for the specific user (creator matches user OR item is shared and user is the creator)
-      if (item.creator !== user && !(item.isShared && item.creator === user)) return false;
+    // Check if any event overlaps with this time slot
+    for (const item of userItems) {
+      const [startHour, startMin] = item.startTime.split(':').map(Number);
+      const [endHour, endMin] = item.endTime.split(':').map(Number);
       
-      // Parse event start/end
-      const [eventStartHour, eventStartMinute] = item.startTime.split(':').map(Number);
-      const [eventEndHour, eventEndMinute] = item.endTime.split(':').map(Number);
-      const eventStart = eventStartHour * 60 + eventStartMinute;
-      const eventEnd = eventEndHour * 60 + eventEndMinute;
+      const eventStart = startHour * 60 + startMin;
+      const eventEnd = endHour * 60 + endMin;
       
-      // Check if the 15-minute slot overlaps with the event
-      if (slotStart < eventEnd && slotEnd > eventStart) {
-        if (item.isRecurring) {
-          const dayMatches = item.day === selectedDay;
-          console.log(`Recurring event ${item.name}: day ${item.day} vs selected ${selectedDay}, matches: ${dayMatches}`);
-          return dayMatches;
-        }
-        const dateMatches = item.date === selectedDate;
-        console.log(`One-time event ${item.name}: date ${item.date} vs selected ${selectedDate}, matches: ${dateMatches}`);
-        return dateMatches;
+      // Check if time slot overlaps with event
+      if (slotStart <= eventEnd && slotEnd > eventStart) {
+        return item.name;
       }
-      return false;
-    });
+    }
     
-    const result = event ? event.name : 'Free';
-    console.log(`Result for ${user} at ${timeLabel}: ${result}`);
-    return result;
+    return 'Free';
   };
 
   useEffect(() => {
@@ -798,135 +799,6 @@ const SchedulePlanner = () => {
             onPress={() => setShowHelp(true)}
           >
             <Image source={require('../assets/help.png')} style={styles.helpIcon} />
-          </TouchableOpacity>
-          
-          {/* Debug Button */}
-          <TouchableOpacity
-            style={styles.debugButton}
-            onPress={() => {
-              console.log('=== DEBUG INFO ===');
-              console.log('Current User:', currentUser);
-              console.log('Selected Date:', selectedDate);
-              console.log('Current Semester:', semester);
-              console.log('Is Comparing:', isComparing);
-              console.log('Users Array:', users);
-              console.log('All Classes Full Length:', allClassesFull.length);
-              console.log('All Classes:', allClassesFull);
-              console.log('Daily Classes Length:', dailyClasses.length);
-              console.log('Daily Classes:', dailyClasses);
-              console.log('getDailySchedule() result:', getDailySchedule());
-              console.log('Time Slots Generated:', generateTimeSlots().length);
-              console.log('=== END DEBUG INFO ===');
-              
-              Alert.alert(
-                'Debug Info',
-                `isComparing: ${isComparing}\nselectedDate: ${selectedDate}\nusers: ${users.length}\nclasses: ${allClassesFull.length}\ntimeSlots: ${generateTimeSlots().length}`,
-                [{ text: 'OK' }]
-              );
-            }}
-          >
-            <Text style={styles.debugButtonText}>🐛 Debug</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.refreshButton}
-            onPress={forceRefresh}
-          >
-            <Text style={styles.debugButtonText}>Refresh</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.debugShowButton}
-            onPress={async () => {
-              const savedClasses = await AsyncStorage.getItem('allClasses');
-              console.log('=== ASYNCSTORAGE DEBUG ===');
-              console.log('Raw saved classes:', savedClasses);
-              if (savedClasses) {
-                const parsed = JSON.parse(savedClasses);
-                console.log('Parsed classes:', parsed);
-                console.log('Number of classes:', parsed.length);
-              } else {
-                console.log('No classes found in AsyncStorage');
-              }
-              console.log('=== END ASYNCSTORAGE DEBUG ===');
-              
-              Alert.alert(
-                'AsyncStorage Debug',
-                `Raw data: ${savedClasses ? savedClasses.substring(0, 200) + '...' : 'null'}`,
-                [{ text: 'OK' }]
-              );
-            }}
-          >
-            <Text style={styles.debugButtonText}>Storage</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.debugShowButton}
-            onPress={() => {
-              console.log('=== CURRENT STATE DEBUG ===');
-              console.log('Selected Date:', selectedDate);
-              console.log('All Classes Full:', allClassesFull);
-              console.log('All Classes Full Length:', allClassesFull.length);
-              console.log('Current User:', currentUser);
-              console.log('Is Comparing:', isComparing);
-              console.log('Users:', users);
-              console.log('=== END CURRENT STATE DEBUG ===');
-              
-              Alert.alert(
-                'Current State',
-                `Selected Date: ${selectedDate}\nClasses: ${allClassesFull.length}\nIs Comparing: ${isComparing}`,
-                [{ text: 'OK' }]
-              );
-            }}
-          >
-            <Text style={styles.debugButtonText}>State</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.debugShowButton}
-            onPress={async () => {
-              // Create a single test class for Maria
-              const today = new Date();
-              const todayString = today.toISOString().split('T')[0];
-              const todayDay = today.getDay();
-              
-              const singleTestClass = {
-                id: 'single-test',
-                name: 'Test Class',
-                creator: 'Maria',
-                startTime: '09:00',
-                endTime: '10:00',
-                day: todayDay,
-                date: todayString,
-                isRecurring: false,
-                semester: 'Fall 2025',
-                isShared: false
-              };
-              
-              console.log('Creating single test class:', singleTestClass);
-              await AsyncStorage.setItem('allClasses', JSON.stringify([singleTestClass]));
-              await loadClasses();
-              setSelectedDate(todayString);
-              
-              Alert.alert('Single Test', 'Created one test class for Maria. Check Compare tab!');
-            }}
-          >
-            <Text style={styles.debugButtonText}>Single Test</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.debugShowButton}
-            onPress={async () => {
-              // Clear all data
-              await AsyncStorage.removeItem('allClasses');
-              await loadClasses();
-              setSelectedDate(null);
-              
-              Alert.alert('Cleared', 'All data cleared!');
-            }}
-          >
-            <Text style={styles.debugButtonText}>Clear All</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.deleteAllButton}
-            onPress={handleDeleteAll}
-          >
-            <Text style={styles.deleteButtonText}>Delete All</Text>
           </TouchableOpacity>
         </View>
       </Animatable.View>
@@ -1318,32 +1190,53 @@ const SchedulePlanner = () => {
                         setCurrentScrollY(event.nativeEvent.contentOffset.y);
                       }}
                       scrollEventThrottle={16}
+                      contentContainerStyle={{ paddingBottom: 20 }}
+                      onLayout={() => {
+                        if (timeListRef) {
+                          timeListRef.scrollTo({ y: 0, animated: false });
+                        }
+                      }}
                     >
                       {/* Time Slots */}
-                      {generateTimeSlots().map((time, index) => (
-                        <View key={time} style={styles.timeSlotContainer}>
-                          <Text style={styles.timeSlotLabel}>{time}</Text>
-                          <View style={styles.usersRow}>
-                            {users.map(user => (
-                              <View key={user} style={styles.userCell}>
-                                <Text style={styles.userName}>{user}</Text>
-                                <Text style={[styles.userSchedule, getEventForUserAtTime(user, time) !== 'Free' && styles.busyCell]}>
-                                  {getEventForUserAtTime(user, time)}
-                                </Text>
-                              </View>
-                            ))}
+                      {generateTimeSlots().map((time, index) => {
+                        return (
+                          <View key={time} style={styles.timeSlotContainer}>
+                            <Text style={styles.timeSlotLabel}>{time}</Text>
+                            <View style={styles.timeSlotContent}>
+                              {users.map((user, userIndex) => {
+                                const event = getEventForUserAtTime(user, time);
+                                const isBusy = event !== 'Free';
+                                return (
+                                  <View 
+                                    key={`${time}-${user}`} 
+                                    style={styles.userTimeSlot}
+                                  >
+                                    <Text style={styles.userNameInSlot}>{user}</Text>
+                                    <View style={[
+                                      styles.statusContainer,
+                                      isBusy && styles.busyTimeSlot
+                                    ]}>
+                                      <Text style={[
+                                        styles.timeSlotText,
+                                        isBusy && styles.busyTimeSlotText
+                                      ]}>
+                                        {isBusy ? event : 'Free'}
+                                      </Text>
+                                    </View>
+                                  </View>
+                                );
+                              })}
+                            </View>
                           </View>
-                        </View>
-                      ))}
+                        );
+                      })}
                     </ScrollView>
-                    
                     {/* Scroll Navigation Buttons */}
                     <View style={styles.scrollNavigation}>
                       <TouchableOpacity
                         style={styles.scrollButton}
                         onPress={() => {
                           if (timeListRef) {
-                            // Scroll up slowly by 300 pixels from current position
                             const newY = Math.max(0, currentScrollY - 300);
                             timeListRef.scrollTo({ y: newY, animated: true });
                           }
@@ -1355,7 +1248,6 @@ const SchedulePlanner = () => {
                         style={styles.scrollButton}
                         onPress={() => {
                           if (timeListRef) {
-                            // Scroll down slowly by 300 pixels from current position
                             const newY = currentScrollY + 300;
                             timeListRef.scrollTo({ y: newY, animated: true });
                           }
@@ -1843,6 +1735,32 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     textAlign: 'center',
   },
+  timeSlotContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+  },
+  userTimeSlot: {
+    flex: 1,
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
+  busyTimeSlot: {
+    backgroundColor: '#ffe6e6',
+    borderRadius: 4,
+    paddingVertical: 2,
+  },
+  timeSlotText: {
+    fontFamily: 'PressStart2P',
+    fontSize: 7,
+    color: '#7a58b8',
+    textAlign: 'center',
+  },
+  busyTimeSlotText: {
+    fontWeight: 'bold',
+    color: '#ff6b6b',
+  },
   usersRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1884,12 +1802,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   helpButton: {
-    padding: 10,
+    backgroundColor: '#7a58b8',
+    padding: 8,
+    borderRadius: 8,
     marginRight: 10,
   },
   helpIcon: {
     width: 20,
     height: 20,
+    tintColor: 'white',
   },
   scrollNavigation: {
     flexDirection: 'row',
@@ -1959,6 +1880,24 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 15,
     marginBottom: 10,
+  },
+  debugButtonsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  userNameInSlot: {
+    fontFamily: 'PressStart2P',
+    fontSize: 8,
+    color: '#6e3abf',
+    fontWeight: 'bold',
+    marginBottom: 2,
+    textAlign: 'center',
+  },
+  statusContainer: {
+    alignItems: 'center',
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    borderRadius: 4,
   },
 });
 
