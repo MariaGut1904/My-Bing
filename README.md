@@ -1,6 +1,6 @@
 # My-Bing
 
-My-Bing is a React Native app that replicates a simple Bing-style search experience. It uses Firebase for backend support and is built with modular components.
+My-Bing is a React Native app that was created for schedule organization between me and my roommates, as well as being a reminder for tasks or homework. It's able to be shared between users. It uses Firebase for backend support and is built with modular components.
 
 ## Setup
 
